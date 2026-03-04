@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>DepthBoost</title>
+<style>
+:root {
+    --neon:   #00ffcc;
+    --neon2:  #00e6b8;
+    --dim:    rgba(0,255,204,0.18);
+    --red:    #ff0033;
+    --panel:  #0a0c0f;
+    --dark:   #060608;
+    --mid:    #111318;
+    --border: rgba(0,255,204,0.14);
+    --text:   rgba(0,255,204,0.85);
+    --sub:    rgba(0,255,204,0.45);
+}
+
+- { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+
+html, body {
+background: var(–dark);
+height: 100dvh; width: 100vw;
+overflow: hidden;
+font-family: ‘SF Mono’, ‘Fira Code’, ‘Courier New’, monospace;
+}
+
+body {
+display: flex;
+justify-content: center;
+align-items: stretch;
+position: relative;
+overscroll-behavior: none;
+touch-action: pan-x pan-y;
+}
+
+/* ── Sky canvas behind everything ── */
+#sky {
+position: fixed; inset: 0;
+width: 100vw; height: 100dvh;
+pointer-events: none; z-index: 0;
+}
+
+/* ── App shell ── */
+.app {
+position: relative; z-index: 1;
+width: 100%; max-width: 420px;
+background: var(–panel);
+display: flex; flex-direction: column;
+box-shadow: 0 0 80px rgba(0,0,0,0.9), 0 0 1px var(–border);
+color: var(–text); -webkit-text-fill-color: var(–text);
+}
+
+/* ── Header ── */
+header {
+padding: 14px 16px 12px;
+background: #070709;
+border-bottom: 1px solid var(–border);
+display: flex; align-items: center; justify-content: space-between;
+flex-shrink: 0;
+}
+.logo {
+font-size: 10px; letter-spacing: 6px; font-weight: 700;
+text-transform: uppercase; color: var(–neon);
+-webkit-text-fill-color: var(–neon);
+}
+.logo span { color: rgba(0,255,204,0.45); -webkit-text-fill-color: rgba(0,255,204,0.45); }
+.status-pill {
+font-size: 8px; letter-spacing: 2px; padding: 4px 10px;
+border: 1px solid var(–border); border-radius: 20px;
+color: var(–sub); -webkit-text-fill-color: var(–sub);
+text-transform: uppercase; transition: all 0.3s;
+}
+.status-pill.active {
+border-color: var(–neon); color: var(–neon);
+-webkit-text-fill-color: var(–neon);
+box-shadow: 0 0 12px rgba(0,255,204,0.25);
+}
+.status-pill.error {
+border-color: var(–red); color: var(–red);
+-webkit-text-fill-color: var(–red);
+}
+
+/* ── Visualiser ── */
+.viz-wrap {
+flex: 1; min-height: 0;
+display: flex; flex-direction: column;
+align-items: center; justify-content: center;
+padding: 8px; background: var(–panel);
+position: relative;
+}
+.viz-label {
+font-size: 7px; letter-spacing: 5px; color: var(–sub);
+-webkit-text-fill-color: var(–sub);
+text-transform: uppercase; margin-bottom: 8px; opacity: 0.7;
+}
+.sphere-wrap {
+position: relative; display: flex;
+align-items: center; justify-content: center;
+}
+.ring-outer {
+position: absolute; border-radius: 50%;
+border: 1px solid rgba(0,255,204,0.09);
+box-shadow: 0 0 40px rgba(0,255,204,0.05), inset 0 0 40px rgba(0,255,204,0.02);
+pointer-events: none;
+top:-16px; left:-16px; right:-16px; bottom:-16px;
+}
+.ring-inner {
+position: absolute; border-radius: 50%;
+border: 1px solid rgba(0,255,204,0.28);
+box-shadow: 0 0 22px rgba(0,255,204,0.15), inset 0 0 22px rgba(0,255,204,0.04);
+pointer-events: none;
+top:-5px; left:-5px; right:-5px; bottom:-5px;
+}
+#vc {
+display: block; border-radius: 50%;
+touch-action: none; user-select: none; -webkit-user-select: none;
+}
+
+/* ── Output level bar ── */
+.level-wrap {
+width: 100%; max-width: 280px;
+margin-top: 12px; display: flex;
+align-items: center; gap: 8px;
+}
+.level-label {
+font-size: 7px; letter-spacing: 2px; color: var(–sub);
+-webkit-text-fill-color: var(–sub); min-width: 24px; opacity: 0.6;
+}
+.level-bar {
+flex: 1; height: 4px; background: rgba(0,255,204,0.07);
+border-radius: 2px; overflow: hidden;
+border: 1px solid rgba(0,255,204,0.1);
+}
+#level-fill {
+height: 100%; width: 0%; border-radius: 2px;
+background: var(–neon);
+box-shadow: 0 0 6px var(–neon);
+transition: width 0.06s ease-out, background 0.2s;
+}
+#level-db {
+font-size: 8px; letter-spacing: 1px; min-width: 42px;
+text-align: right; color: var(–neon);
+-webkit-text-fill-color: var(–neon); opacity: 0.6;
+}
+
+/* ── Control panel ── */
+.controls {
+background: #080a0d;
+border-top: 1px solid var(–border);
+padding: 14px 16px 18px;
+flex-shrink: 0;
+}
+
+/* ── Status line ── */
+#status {
+font-size: 9px; letter-spacing: 3px; color: var(–neon);
+-webkit-text-fill-color: var(–neon);
+text-align: center; text-transform: uppercase;
+margin-bottom: 14px; opacity: 0.75; min-height: 14px;
+}
+
+/* ── Two knob row ── */
+.knob-row {
+display: grid; grid-template-columns: 1fr 1fr;
+gap: 12px; margin-bottom: 16px;
+}
+.knob-cell {
+display: flex; flex-direction: column;
+align-items: center; gap: 8px;
+}
+.knob-title {
+font-size: 8px; letter-spacing: 2.5px; color: var(–neon);
+-webkit-text-fill-color: var(–neon);
+text-transform: uppercase; text-align: center; opacity: 0.9; font-weight: 700;
+}
+.knob-sub {
+font-size: 7px; letter-spacing: 1px; color: var(–sub);
+-webkit-text-fill-color: var(–sub);
+text-align: center; opacity: 0.7;
+}
+
+/* ── Rotary knob ── */
+.knob-outer {
+position: relative; width: 82px; height: 82px;
+cursor: pointer; touch-action: none; user-select: none; -webkit-user-select: none;
+}
+.knob-svg { width: 100%; height: 100%; }
+.knob-val {
+font-size: 11px; letter-spacing: 0; color: var(–neon);
+-webkit-text-fill-color: var(–neon);
+font-weight: 700; text-align: center; margin-top: 2px;
+}
+
+/* ── Buttons ── */
+.btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.btn {
+-webkit-appearance: none; appearance: none;
+background: transparent; border: 1px solid rgba(0,255,204,0.3);
+color: var(–neon); -webkit-text-fill-color: var(–neon);
+font-family: inherit; font-size: 9px; letter-spacing: 2px;
+text-transform: uppercase; font-weight: 700;
+padding: 11px 4px; border-radius: 6px;
+cursor: pointer; transition: all 0.15s;
+outline: none; touch-action: manipulation;
+}
+.btn:active { transform: scale(0.93); opacity: 0.65; }
+.btn.primary {
+border-color: var(–neon); background: rgba(0,255,204,0.06);
+box-shadow: 0 0 18px rgba(0,255,204,0.1);
+}
+.btn.primary.live {
+background: var(–neon); color: #000;
+-webkit-text-fill-color: #000;
+box-shadow: 0 0 24px rgba(0,255,204,0.5);
+}
+.btn.danger { border-color: rgba(255,0,51,0.4); color: var(–red); -webkit-text-fill-color: var(–red); }
+.btn.danger.live { background: var(–red); color: #000; -webkit-text-fill-color: #000; border-color: var(–red); }
+
+/* ── Source info chip ── */
+.source-chip {
+margin-top: 10px; text-align: center;
+font-size: 8px; letter-spacing: 1.5px; color: var(–sub);
+-webkit-text-fill-color: var(–sub); opacity: 0.6;
+text-transform: uppercase;
+}
+
+/* ── Landscape ── */
+@media (orientation:landscape) and (max-height:500px) {
+.app { flex-direction: row; max-width: 100vw; }
+.viz-wrap { width: 42vw; flex-shrink: 0; border-right: 1px solid var(–border); }
+.controls { flex: 1; overflow-y: auto; padding: 10px 14px 12px; }
+#status { margin-bottom: 8px; font-size: 8px; }
+.knob-row { gap: 8px; margin-bottom: 10px; }
+.knob-outer { width: 64px; height: 64px; }
+.btn-row { gap: 6px; }
+.btn { padding: 9px 4px; font-size: 8px; }
+}
+
+/* ── Blink ── */
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.recording { animation: blink 0.8s ease-in-out infinite; }
+</style>
+
+</head>
+<body>
+
+<canvas id="sky"></canvas>
+
+<div class="app">
+
+```
+<header>
+    <div class="logo">DEPTH<span>BOOST</span></div>
+    <div class="status-pill" id="pill">STANDBY</div>
+</header>
+
+<div class="viz-wrap">
+    <div class="viz-label">IMMERSION SPHERE</div>
+    <div class="sphere-wrap">
+        <div class="ring-outer"></div>
+        <div class="ring-inner"></div>
+        <canvas id="vc"></canvas>
+    </div>
+    <div class="level-wrap">
+        <span class="level-label">OUT</span>
+        <div class="level-bar"><div id="level-fill"></div></div>
+        <span id="level-db">— dB</span>
+    </div>
+</div>
+
+<div class="controls">
+    <div id="status">TAP CAPTURE TO BEGIN</div>
+
+    <div class="knob-row">
+        <!-- Knob 1: Volume / Clarity -->
+        <div class="knob-cell">
+            <div class="knob-title">VOLUME<br>CLARITY</div>
+            <div class="knob-outer" id="knob-boost" data-val="35">
+                <svg class="knob-svg" viewBox="0 0 82 82">
+                    <!-- Track arc -->
+                    <circle cx="41" cy="41" r="32" fill="none"
+                        stroke="rgba(0,255,204,0.08)" stroke-width="4"
+                        stroke-dasharray="175 226" stroke-dashoffset="-25"
+                        stroke-linecap="round"/>
+                    <!-- Value arc -->
+                    <circle id="karc-boost" cx="41" cy="41" r="32" fill="none"
+                        stroke="#00ffcc" stroke-width="4"
+                        stroke-dasharray="0 226" stroke-dashoffset="-25"
+                        stroke-linecap="round"
+                        style="filter:drop-shadow(0 0 4px #00ffcc)"/>
+                    <!-- Knob body -->
+                    <circle cx="41" cy="41" r="24" fill="#0d1014"
+                        stroke="rgba(0,255,204,0.2)" stroke-width="1"/>
+                    <!-- Tick line -->
+                    <line id="ktick-boost" x1="41" y1="20" x2="41" y2="26"
+                        stroke="#00ffcc" stroke-width="2" stroke-linecap="round"
+                        style="transform-origin:41px 41px"/>
+                </svg>
+            </div>
+            <div class="knob-val" id="kval-boost">35%</div>
+            <div class="knob-sub">BBE · FBQ · AFS</div>
+        </div>
+
+        <!-- Knob 2: Lo Contour -->
+        <div class="knob-cell">
+            <div class="knob-title">LO<br>CONTOUR</div>
+            <div class="knob-outer" id="knob-bass" data-val="30">
+                <svg class="knob-svg" viewBox="0 0 82 82">
+                    <circle cx="41" cy="41" r="32" fill="none"
+                        stroke="rgba(0,255,204,0.08)" stroke-width="4"
+                        stroke-dasharray="175 226" stroke-dashoffset="-25"
+                        stroke-linecap="round"/>
+                    <circle id="karc-bass" cx="41" cy="41" r="32" fill="none"
+                        stroke="#00ffcc" stroke-width="4"
+                        stroke-dasharray="0 226" stroke-dashoffset="-25"
+                        stroke-linecap="round"
+                        style="filter:drop-shadow(0 0 4px #00ffcc)"/>
+                    <circle cx="41" cy="41" r="24" fill="#0d1014"
+                        stroke="rgba(0,255,204,0.2)" stroke-width="1"/>
+                    <line id="ktick-bass" x1="41" y1="20" x2="41" y2="26"
+                        stroke="#00ffcc" stroke-width="2" stroke-linecap="round"
+                        style="transform-origin:41px 41px"/>
+                </svg>
+            </div>
+            <div class="knob-val" id="kval-bass">30%</div>
+            <div class="knob-sub">80–200 Hz</div>
+        </div>
+    </div>
+
+    <div class="btn-row">
+        <button class="btn primary" id="btn-capture">▶ CAPTURE</button>
+        <button class="btn" id="btn-bypass">⊘ BYPASS</button>
+    </div>
+    <div class="source-chip" id="source-chip">NO SOURCE CONNECTED</div>
+</div>
+```
+
+</div>
+
+<script>
+"use strict";
+
+// ═══════════════════════════════════════════════════════
+//  CANVAS SETUP
+// ═══════════════════════════════════════════════════════
+const vc  = document.getElementById('vc');
+const ctx = vc.getContext('2d');
+let SIZE, CX, CY, R;
+
+function sizeCanvas(){
+    const isLand = window.innerWidth > window.innerHeight && window.innerHeight < 500;
+    if(isLand){
+        const col = Math.round(window.innerWidth * 0.42);
+        SIZE = Math.min(col, window.innerHeight - 60) - 30;
+    } else {
+        // Portrait: fit within available vertical space
+        const avail = window.innerHeight - 340;
+        SIZE = Math.min(Math.round(window.innerWidth * 0.6), avail, 220);
+    }
+    SIZE = Math.max(SIZE, 90);
+    vc.width = vc.height = SIZE;
+    vc.style.width = vc.style.height = SIZE + 'px';
+    CX = CY = SIZE / 2; R = SIZE * 0.455;
+}
+sizeCanvas();
+window.addEventListener('resize', () => { sizeCanvas(); rebuildStars(); });
+
+// ═══════════════════════════════════════════════════════
+//  GEODESIC SPHERE
+// ═══════════════════════════════════════════════════════
+const NODES = [], EDGES = [];
+(function buildGeo(){
+    const LD=10, LO=20;
+    for(let li=0;li<=LD;li++){
+        const frac=li/LD, lat=-Math.PI/2+Math.PI*frac;
+        const type=frac<0.33?'lo':frac>0.66?'hi':'mid';
+        const fi=type==='lo'?Math.floor(Math.random()*5):type==='hi'?19+Math.floor(Math.random()*37):5+Math.floor(Math.random()*14);
+        const cnt=Math.max(1,Math.round(LO*Math.cos(lat)));
+        for(let lj=0;lj<cnt;lj++) NODES.push({lat,lon:2*Math.PI*lj/cnt+(li%2?.18:0),type,fi});
+    }
+    for(let a=0;a<NODES.length;a++) for(let b=a+1;b<NODES.length;b++){
+        const na=NODES[a],nb=NODES[b];
+        let dl=Math.abs(na.lon-nb.lon); if(dl>Math.PI) dl=2*Math.PI-dl;
+        if(Math.sqrt((na.lat-nb.lat)**2+(dl*Math.cos((na.lat+nb.lat)/2))**2)<0.40) EDGES.push([a,b]);
+    }
+})();
+
+function proj(lat,lon,rotY){
+    const cl=Math.cos(lat),sl=Math.sin(lat),co=Math.cos(lon+rotY),so=Math.sin(lon+rotY);
+    return{x:CX+cl*so*R, y:CY-sl*R, z:cl*co};
+}
+
+// ── Stars ──
+const BANDS=[...Array(18).fill('lo'),...Array(16).fill('mid'),...Array(18).fill('hi')];
+let STARS=[];
+function makeStars(){
+    return BANDS.map(band=>{
+        const orbitR=0.13+Math.random()*0.68, dir=Math.random()<0.3?-1:1;
+        const speed=dir*(0.055+Math.random()*0.20)/Math.sqrt(orbitR);
+        const inclBase=band==='lo'?(Math.random()-0.5)*0.55:band==='hi'?Math.PI*0.5+(Math.random()-0.5)*0.7:(Math.random()-0.5)*Math.PI;
+        const fi=band==='lo'?Math.floor(Math.random()*5):band==='hi'?19+Math.floor(Math.random()*35):5+Math.floor(Math.random()*14);
+        const ecc=Math.random()*0.42;
+        return{band,fi,hue:band,orbitR,speed,inclBase,
+            ascNode0:Math.random()*Math.PI*2, precRate:(Math.random()-0.5)*0.012,
+            wobbleAmp:0.02+Math.random()*0.08, wobbleSpd:0.008+Math.random()*0.025,
+            wobblePhs:Math.random()*Math.PI*2, ecc, phase:Math.random()*Math.PI*2,
+            size:0.10+Math.random()*0.48*(1-orbitR*0.3), basOp:0.20+Math.random()*0.50,
+            twinkleSpeed:0.5+Math.random()*2.5, twinkleAmp:0.08+Math.random()*0.28,
+            twinklePhase:Math.random()*Math.PI*2, trailLen:3+Math.floor(Math.random()*5),
+            trailDt:0.18+Math.random()*0.25};
+    });
+}
+STARS=makeStars();
+function rebuildStars(){ STARS=makeStars(); }
+
+function starPos(s,t,off){
+    const te=t-(off||0);
+    const asc=s.ascNode0+s.precRate*te;
+    const inc=s.inclBase+s.wobbleAmp*Math.sin(s.wobbleSpd*te+s.wobblePhs);
+    const M=s.phase+s.speed*te, E=M+s.ecc*Math.sin(M);
+    const trA=2*Math.atan2(Math.sqrt(1+s.ecc)*Math.sin(E/2),Math.sqrt(1-s.ecc)*Math.cos(E/2));
+    const r=Math.min(s.orbitR*R*(1-s.ecc*s.ecc)/(1+s.ecc*Math.cos(trA)),R*0.87);
+    const xO=r*Math.cos(trA),yO=r*Math.sin(trA);
+    const cI=Math.cos(inc),sI=Math.sin(inc),cN=Math.cos(asc),sN=Math.sin(asc);
+    return{sx:CX+cN*xO-sN*yO*cI, sy:CY-(sN*xO+cN*yO*cI), depth:(yO*sI)/R};
+}
+
+// ═══════════════════════════════════════════════════════
+//  SKY STARFIELD
+// ═══════════════════════════════════════════════════════
+(function(){
+    const sky=document.getElementById('sky'), sc=sky.getContext('2d');
+    let sw,sh,SS=[];
+    const COLS=[[190,240,255],[210,255,248],[200,220,255],[180,210,255],[155,235,255]];
+    function makeS(){
+        SS=[];
+        const n=Math.round(sw*sh/1800);
+        for(let i=0;i<n;i++){
+            const col=COLS[Math.random()<0.6?0:Math.floor(Math.random()*COLS.length)];
+            const sz=Math.random()<0.92?.25+Math.random()*.6:.8+Math.random()*1.0;
+            SS.push({x:Math.random()*sw,y:Math.random()*sh,sz,col,
+                ba:.35+Math.random()*.55,ts:.4+Math.random()*2.2,
+                ta:.06+Math.random()*.28,tp:Math.random()*Math.PI*2,
+                dx:(Math.random()-.5)*.012,dy:(Math.random()-.5)*.006});
+        }
+    }
+    function resize(){ sw=sky.width=window.innerWidth; sh=sky.height=window.innerHeight; makeS(); }
+    resize(); window.addEventListener('resize',resize);
+    function loop(){
+        requestAnimationFrame(loop);
+        const t=Date.now()/1000;
+        const g=sc.createLinearGradient(0,0,0,sh);
+        g.addColorStop(0,'#07080c'); g.addColorStop(.5,'#060608'); g.addColorStop(1,'#040406');
+        sc.fillStyle=g; sc.fillRect(0,0,sw,sh);
+        [[sw*.15,sh*.2,sw*.28],[sw*.78,sh*.6,sw*.22],[sw*.5,sh*.85,sw*.18]].forEach(([nx,ny,nr])=>{
+            const ng=sc.createRadialGradient(nx,ny,0,nx,ny,nr);
+            ng.addColorStop(0,'rgba(0,50,42,0.07)'); ng.addColorStop(1,'rgba(0,0,0,0)');
+            sc.fillStyle=ng; sc.fillRect(0,0,sw,sh);
+        });
+        SS.forEach(s=>{
+            s.x=(s.x+s.dx+sw)%sw; s.y=(s.y+s.dy+sh)%sh;
+            const tw=1+s.ta*Math.sin(t*s.ts+s.tp), al=Math.min(1,s.ba*tw);
+            const[r,g,b]=s.col;
+            if(s.sz>.7){
+                const h=sc.createRadialGradient(s.x,s.y,0,s.x,s.y,s.sz*3.5);
+                h.addColorStop(0,`rgba(${r},${g},${b},${al*.3})`); h.addColorStop(1,'rgba(0,0,0,0)');
+                sc.beginPath(); sc.arc(s.x,s.y,s.sz*3.5,0,Math.PI*2); sc.fillStyle=h; sc.fill();
+            }
+            sc.beginPath(); sc.arc(s.x,s.y,Math.max(.2,s.sz),0,Math.PI*2);
+            sc.fillStyle=`rgba(${r},${g},${b},${al})`; sc.fill();
+        });
+    }
+    loop();
+})();
+
+// ═══════════════════════════════════════════════════════
+//  AUDIO ENGINE
+// ═══════════════════════════════════════════════════════
+let audioCtx=null, analyser=null, sourceNode=null, stream=null;
+let loContour, bbeHi, bbePresence, bbeWave;
+let fbqN1, fbqN2, fbqN3;
+let afsN1, afsN2, afsN3;
+let seriesGain, parallelGain, sumNode, limiter, masterGain;
+let afsTimer=null;
+let isLive=false, isBypassed=false;
+
+function buildGraph(src){
+    audioCtx    = new(window.AudioContext||window.webkitAudioContext)({sampleRate:44100,latencyHint:'playback'});
+    analyser    = audioCtx.createAnalyser();
+    analyser.fftSize=2048; analyser.smoothingTimeConstant=0.82;
+
+    sourceNode  = audioCtx.createMediaStreamSource(src);
+
+    // ── LO CONTOUR (independent bass shelf, pre-chain) ──────────────────────
+    loContour   = audioCtx.createBiquadFilter();
+    loContour.type='lowshelf'; loContour.frequency.value=getContourFreq(); loContour.gain.value=0;
+
+    // ── SERIES: BBE 882i Definition stage ───────────────────────────────────
+    bbeHi       = audioCtx.createBiquadFilter();
+    bbeHi.type='highshelf'; bbeHi.frequency.value=3200; bbeHi.gain.value=0;
+
+    bbePresence = audioCtx.createBiquadFilter();
+    bbePresence.type='peaking'; bbePresence.frequency.value=5200; bbePresence.Q.value=0.85; bbePresence.gain.value=0;
+
+    bbeWave     = audioCtx.createWaveShaper();
+    bbeWave.oversample='4x'; applyWaveshaper(0);
+
+    // ── FBQ1000 — protective dynamic notches ────────────────────────────────
+    fbqN1=audioCtx.createBiquadFilter(); fbqN1.type='notch'; fbqN1.frequency.value=400;  fbqN1.Q.value=10;
+    fbqN2=audioCtx.createBiquadFilter(); fbqN2.type='notch'; fbqN2.frequency.value=800;  fbqN2.Q.value=10;
+    fbqN3=audioCtx.createBiquadFilter(); fbqN3.type='notch'; fbqN3.frequency.value=2500; fbqN3.Q.value=10;
+
+    seriesGain  = audioCtx.createGain(); seriesGain.gain.value=0.5;
+
+    // ── PARALLEL: DBX AFS-2 adaptive suppression ────────────────────────────
+    afsN1=audioCtx.createBiquadFilter(); afsN1.type='notch'; afsN1.frequency.value=630;  afsN1.Q.value=14;
+    afsN2=audioCtx.createBiquadFilter(); afsN2.type='notch'; afsN2.frequency.value=1250; afsN2.Q.value=14;
+    afsN3=audioCtx.createBiquadFilter(); afsN3.type='notch'; afsN3.frequency.value=3150; afsN3.Q.value=14;
+
+    parallelGain = audioCtx.createGain(); parallelGain.gain.value=0.5;
+
+    // ── SUM + BRICK WALL LIMITER −0.1 dBFS ─────────────────────────────────
+    sumNode     = audioCtx.createGain(); sumNode.gain.value=1.0;
+
+    limiter     = audioCtx.createDynamicsCompressor();
+    limiter.threshold.value=-0.1; limiter.knee.value=0;
+    limiter.ratio.value=20; limiter.attack.value=0.001; limiter.release.value=0.08;
+
+    masterGain  = audioCtx.createGain(); masterGain.gain.value=1.0;
+
+    // ── ROUTING ─────────────────────────────────────────────────────────────
+    //  source → loContour ─┬─ bbeHi→bbePresence→bbeWave→fbq×3→seriesGain ─┐
+    //                      └─ afsN×3→parallelGain ──────────────────────────┤
+    //                                                               sumNode→limiter→master→analyser→dest
+    sourceNode.connect(loContour);
+    loContour.connect(bbeHi); bbeHi.connect(bbePresence); bbePresence.connect(bbeWave);
+    bbeWave.connect(fbqN1); fbqN1.connect(fbqN2); fbqN2.connect(fbqN3); fbqN3.connect(seriesGain);
+    seriesGain.connect(sumNode);
+
+    loContour.connect(afsN1); afsN1.connect(afsN2); afsN2.connect(afsN3); afsN3.connect(parallelGain);
+    parallelGain.connect(sumNode);
+
+    sumNode.connect(limiter); limiter.connect(masterGain);
+    masterGain.connect(analyser); analyser.connect(audioCtx.destination);
+
+    startAFS();
+    applyBoost(getKnobVal('boost'));
+    applyBass(getKnobVal('bass'));
+}
+
+function applyWaveshaper(drive){
+    const n=512, curve=new Float32Array(n);
+    for(let i=0;i<n;i++){
+        const x=(i*2/n)-1, k=drive*10;
+        curve[i]=k===0?x:(3*x-x*x*x*(k/3))/(2+k*x*x*0.5);
+    }
+    bbeWave.curve=curve;
+}
+
+// ── One-knob BOOST (BBE + FBQ + AFS) ────────────────────────────────────────
+function applyBoost(v){
+    if(!audioCtx) return;
+    const dB=v*14, lin=Math.pow(10,dB/20);
+    bbeHi.gain.value      = v*8;
+    bbePresence.gain.value= v*6;
+    applyWaveshaper(v*0.5);
+    const nd=-(v*3);
+    fbqN1.gain.value=nd; fbqN2.gain.value=nd; fbqN3.gain.value=nd;
+    seriesGain.gain.value   = lin*0.5;
+    parallelGain.gain.value = lin*0.5;
+}
+
+// ── Lo Contour (independent bass shelf) ─────────────────────────────────────
+function applyBass(v){
+    if(!audioCtx) return;
+    loContour.gain.value = v*11;
+}
+
+// ── Bypass ───────────────────────────────────────────────────────────────────
+function applyBypass(bypassed){
+    if(!audioCtx) return;
+    if(bypassed){
+        bbeHi.gain.value=0; bbePresence.gain.value=0; applyWaveshaper(0);
+        fbqN1.gain.value=0; fbqN2.gain.value=0; fbqN3.gain.value=0;
+        loContour.gain.value=0;
+        seriesGain.gain.value=0.5; parallelGain.gain.value=0.5;
+    } else {
+        applyBoost(getKnobVal('boost'));
+        applyBass(getKnobVal('bass'));
+    }
+}
+
+// ── Adaptive AFS notch ───────────────────────────────────────────────────────
+function startAFS(){
+    if(afsTimer) clearInterval(afsTimer);
+    afsTimer=setInterval(()=>{
+        if(!analyser||!isLive) return;
+        const bins=analyser.frequencyBinCount;
+        const fd=new Float32Array(bins);
+        analyser.getFloatFrequencyData(fd);
+        const sr=audioCtx.sampleRate;
+        const lo=Math.floor(200/(sr/2)*bins), hi=Math.ceil(7000/(sr/2)*bins);
+        let pBin=lo, pVal=-Infinity;
+        for(let i=lo;i<hi;i++) if(fd[i]>pVal){pVal=fd[i];pBin=i;}
+        if(pVal>-22){
+            const hz=(pBin/bins)*(sr/2);
+            afsN3.frequency.value=afsN3.frequency.value*0.72+hz*0.28;
+        }
+    },600);
+}
+
+function getContourFreq(){
+    const w=Math.min(window.screen.width,window.screen.height);
+    return w<400?200:w<768?165:120;
+}
+
+// ═══════════════════════════════════════════════════════
+//  CAPTURE SYSTEM AUDIO
+// ═══════════════════════════════════════════════════════
+const btnCapture = document.getElementById('btn-capture');
+const btnBypass  = document.getElementById('btn-bypass');
+const pill       = document.getElementById('pill');
+const statusEl   = document.getElementById('status');
+const chip       = document.getElementById('source-chip');
+
+function setStatus(msg){ statusEl.textContent=msg; }
+
+async function startCapture(){
+    if(isLive){ stopCapture(); return; }
+    setStatus('REQUESTING AUDIO…');
+    try{
+        // Try system audio first (getDisplayMedia — works on desktop Chrome/Edge)
+        // On iOS/Android Safari we fall back to microphone input
+        let src;
+        if(navigator.mediaDevices.getDisplayMedia){
+            try{
+                src = await navigator.mediaDevices.getDisplayMedia({
+                    video:false,
+                    audio:{
+                        echoCancellation:false,
+                        noiseSuppression:false,
+                        autoGainControl:false,
+                        sampleRate:44100,
+                    }
+                });
+                chip.textContent='SOURCE: SYSTEM / TAB AUDIO';
+            } catch(e){
+                // User denied display capture, fall through to mic
+                if(e.name==='NotAllowedError'||e.name==='AbortError'){
+                    setStatus('CAPTURE DENIED');
+                    pill.className='status-pill error'; pill.textContent='DENIED';
+                    return;
+                }
+                // Display media not supported — try mic
+                src = await navigator.mediaDevices.getUserMedia({
+                    audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}
+                });
+                chip.textContent='SOURCE: MICROPHONE INPUT';
+            }
+        } else {
+            // No getDisplayMedia — mic only
+            src = await navigator.mediaDevices.getUserMedia({
+                audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}
+            });
+            chip.textContent='SOURCE: MICROPHONE INPUT';
+        }
+
+        stream=src;
+        buildGraph(src);
+        isLive=true;
+
+        btnCapture.textContent='■ STOP';
+        btnCapture.classList.add('live');
+        pill.className='status-pill active'; pill.textContent='LIVE';
+        setStatus('ENHANCING · ACTIVE');
+
+        // If stream track ends externally (e.g. user stops screen share)
+        stream.getTracks().forEach(t=>t.addEventListener('ended',()=>{
+            if(isLive) stopCapture();
+        }));
+
+    } catch(e){
+        console.error(e);
+        setStatus('CANNOT ACCESS AUDIO');
+        pill.className='status-pill error'; pill.textContent='ERROR';
+        chip.textContent='CHECK BROWSER PERMISSIONS';
+    }
+}
+
+function stopCapture(){
+    if(stream) stream.getTracks().forEach(t=>t.stop()); stream=null;
+    if(afsTimer){ clearInterval(afsTimer); afsTimer=null; }
+    if(audioCtx){ audioCtx.close(); audioCtx=null; }
+    analyser=null; sourceNode=null; isLive=false; isBypassed=false;
+    btnCapture.textContent='▶ CAPTURE';
+    btnCapture.classList.remove('live');
+    btnBypass.classList.remove('live'); btnBypass.textContent='⊘ BYPASS';
+    pill.className='status-pill'; pill.textContent='STANDBY';
+    setStatus('TAP CAPTURE TO BEGIN');
+    chip.textContent='NO SOURCE CONNECTED';
+    document.getElementById('level-fill').style.width='0%';
+    document.getElementById('level-db').textContent='— dB';
+}
+
+btnCapture.addEventListener('click', startCapture);
+
+btnBypass.addEventListener('click',()=>{
+    if(!isLive){ setStatus('CAPTURE AUDIO FIRST'); return; }
+    isBypassed=!isBypassed;
+    applyBypass(isBypassed);
+    btnBypass.classList.toggle('live', isBypassed);
+    btnBypass.textContent = isBypassed ? '▶ ENHANCE' : '⊘ BYPASS';
+    pill.className='status-pill'+(isBypassed?' error':' active');
+    pill.textContent = isBypassed ? 'BYPASS' : 'LIVE';
+    setStatus(isBypassed ? 'BYPASSED · PASSTHROUGH' : 'ENHANCING · ACTIVE');
+});
+
+// ═══════════════════════════════════════════════════════
+//  ROTARY KNOBS
+// ═══════════════════════════════════════════════════════
+// Knob maps 0–100% to -135° → +135° (270° sweep)
+const KNOB_MIN=-135, KNOB_MAX=135, KNOB_SWEEP=270;
+
+function getKnobVal(id){ return parseInt(document.getElementById('knob-'+id).dataset.val)/100; }
+
+function updateKnobUI(id, pct){
+    // pct = 0–100
+    const frac=pct/100;
+    const deg = KNOB_MIN + frac*KNOB_SWEEP;
+    const degRad = (deg-90)*Math.PI/180; // offset so 0 is top
+
+    // Tick rotation
+    document.getElementById('ktick-'+id).style.transform=`rotate(${deg}deg)`;
+
+    // Arc: circumference=2πr=201, track uses dasharray 175 (5/8 of circle)
+    const CIRC=2*Math.PI*32; // ≈201
+    const arcLen=frac*(CIRC*0.75); // 75% = 270°/360°
+    const arc=document.getElementById('karc-'+id);
+    arc.setAttribute('stroke-dasharray',`${arcLen} ${CIRC}`);
+
+    // Color shift: teal → yellow-green → amber at high gain
+    const hue=165-frac*60;
+    const col=`hsl(${hue},100%,55%)`;
+    arc.setAttribute('stroke',col);
+    arc.style.filter=`drop-shadow(0 0 5px ${col})`;
+    document.getElementById('ktick-'+id).setAttribute('stroke',col);
+
+    // Value label
+    const dB=(frac*14).toFixed(1);
+    document.getElementById('kval-'+id).textContent=
+        id==='boost' ? (pct===0?'0 dB':'+'+dB+' dB') : pct+'%';
+
+    if(!isBypassed){
+        if(id==='boost') applyBoost(frac);
+        if(id==='bass')  applyBass(frac);
+    }
+}
+
+function bindKnob(id){
+    const el=document.getElementById('knob-'+id);
+    let startY, startVal, dragging=false;
+
+    function onStart(e){
+        dragging=true;
+        startY = (e.touches?e.touches[0].clientY:e.clientY);
+        startVal = parseInt(el.dataset.val);
+        e.preventDefault();
+    }
+    function onMove(e){
+        if(!dragging) return;
+        const y=(e.touches?e.touches[0].clientY:e.clientY);
+        const delta=Math.round((startY-y)*0.9); // drag up = increase
+        const newVal=Math.min(100,Math.max(0,startVal+delta));
+        el.dataset.val=newVal;
+        updateKnobUI(id,newVal);
+        e.preventDefault();
+    }
+    function onEnd(){ dragging=false; }
+
+    el.addEventListener('touchstart',onStart,{passive:false});
+    el.addEventListener('touchmove', onMove,{passive:false});
+    el.addEventListener('touchend',  onEnd);
+    el.addEventListener('mousedown', onStart);
+    window.addEventListener('mousemove',onMove);
+    window.addEventListener('mouseup',  onEnd);
+
+    // Scroll wheel support (desktop)
+    el.addEventListener('wheel',e=>{
+        const v=parseInt(el.dataset.val);
+        const n=Math.min(100,Math.max(0,v+(e.deltaY<0?2:-2)));
+        el.dataset.val=n; updateKnobUI(id,n); e.preventDefault();
+    },{passive:false});
+}
+
+bindKnob('boost');
+bindKnob('bass');
+// Set initial UI state
+updateKnobUI('boost',35);
+updateKnobUI('bass',30);
+
+// ═══════════════════════════════════════════════════════
+//  DRAW LOOP — sphere + level meter
+// ═══════════════════════════════════════════════════════
+let rmsSmooth=0;
+
+function draw(){
+    requestAnimationFrame(draw);
+    const bins=analyser?analyser.frequencyBinCount:64;
+    const freq=new Uint8Array(bins);
+    if(analyser) analyser.getByteFrequencyData(freq);
+
+    const boostV=getKnobVal('boost');
+    const bassV =getKnobVal('bass');
+
+    // ── Level meter (RMS of high bins) ──────────────────────────────────────
+    if(analyser&&isLive){
+        let sum=0;
+        for(let i=0;i<bins;i++) sum+=(freq[i]/255)**2;
+        const rms=Math.sqrt(sum/bins);
+        rmsSmooth=rmsSmooth*0.88+rms*0.12;
+        const db=20*Math.log10(Math.max(rmsSmooth,1e-6));
+        const pct=Math.min(100,Math.max(0,(db+60)/60*100));
+        const hue=165-pct*0.55;
+        const fill=document.getElementById('level-fill');
+        fill.style.width=pct+'%';
+        fill.style.background=`hsl(${hue},100%,55%)`;
+        fill.style.boxShadow=`0 0 6px hsl(${hue},100%,55%)`;
+        document.getElementById('level-db').textContent=db>-60?db.toFixed(1)+' dB':'— dB';
+    }
+
+    // ── Sphere ───────────────────────────────────────────────────────────────
+    ctx.clearRect(0,0,SIZE,SIZE);
+    const bg=ctx.createRadialGradient(CX,CY*.85,0,CX,CY,R*1.05);
+    bg.addColorStop(0,'rgba(4,28,22,1)'); bg.addColorStop(.5,'rgba(2,14,12,1)'); bg.addColorStop(1,'rgba(0,4,8,1)');
+    ctx.beginPath(); ctx.arc(CX,CY,R,0,Math.PI*2); ctx.fillStyle=bg; ctx.fill();
+    ctx.save(); ctx.beginPath(); ctx.arc(CX,CY,R-.5,0,Math.PI*2); ctx.clip();
+
+    const t=Date.now()/1000;
+    STARS.forEach(s=>{
+        const rawF=freq[Math.min(s.fi,bins-1)]/255;
+        const boost=s.band==='lo'?bassV*.6:s.band==='hi'?boostV*.6:boostV*.4;
+        const energy=Math.min(1,rawF+boost);
+        let cr,cg,cb;
+        if(s.hue==='lo'){cr=0;cg=210;cb=140;}else if(s.hue==='hi'){cr=170;cg=235;cb=255;}else{cr=0;cg=255;cb=215;}
+        const bl=energy*.68;
+        const r=Math.round(cr+(255-cr)*bl),g=Math.round(cg+(255-cg)*bl*.45),b=Math.round(cb+(255-cb)*bl*.25);
+        for(let step=s.trailLen;step>=1;step--){
+            const gh=starPos(s,t,step*s.trailDt); if(gh.depth<-.05) continue;
+            const gd=.28+.72*((gh.depth+1)/2), fd=1-step/(s.trailLen+1);
+            ctx.beginPath(); ctx.arc(gh.sx,gh.sy,Math.max(.1,s.size*.55*fd*gd),0,Math.PI*2);
+            ctx.fillStyle=`rgba(${cr},${cg},${cb},${fd*.18*gd*(.4+energy*.5)})`; ctx.fill();
+        }
+        const pos=starPos(s,t); if(pos.depth<-.08) return;
+        const da=.28+.72*((pos.depth+1)/2), ds=.50+.50*((pos.depth+1)/2);
+        const tw=1+(s.twinkleAmp+energy*.22)*Math.sin(t*s.twinkleSpeed+s.twinklePhase);
+        const al=Math.min(1,(s.basOp+energy*.45)*da*tw);
+        const rad=(s.size+energy*1.1)*ds;
+        const hR=Math.max(rad*2.5,rad*2.5+energy*4.5);
+        if(al>.08){
+            const gw=ctx.createRadialGradient(pos.sx,pos.sy,0,pos.sx,pos.sy,hR);
+            gw.addColorStop(0,`rgba(${r},${g},${b},${al*(.28+energy*.38)})`);
+            gw.addColorStop(.5,`rgba(${cr},${cg},${cb},${al*.05})`);
+            gw.addColorStop(1,'rgba(0,0,0,0)');
+            ctx.beginPath(); ctx.arc(pos.sx,pos.sy,hR,0,Math.PI*2); ctx.fillStyle=gw; ctx.fill();
+        }
+        ctx.beginPath(); ctx.arc(pos.sx,pos.sy,Math.max(.18,rad),0,Math.PI*2);
+        ctx.fillStyle=`rgba(${r},${g},${b},${Math.min(1,al)})`; ctx.fill();
+    });
+
+    const rotY=(Date.now()/1000)*.16;
+    const P=NODES.map(n=>proj(n.lat,n.lon,rotY));
+    const eS=EDGES.map(([a,b])=>({a,b,pa:P[a],pb:P[b],mZ:(P[a].z+P[b].z)/2})).sort((x,y)=>x.mZ-y.mZ);
+    eS.forEach(({a,b,pa,pb,mZ})=>{
+        if(pa.z<0&&pb.z<0) return;
+        const vis=Math.min(1,Math.max(0,mZ+.18)*3.5); if(vis<=0) return;
+        const na=NODES[a],nb=NODES[b];
+        const e=(freq[Math.min(na.fi,bins-1)]+freq[Math.min(nb.fi,bins-1)])/(2*255);
+        const[r,g,b2]=na.type==='lo'?[0,200,155]:na.type==='hi'?[160,245,255]:[0,255,215];
+        ctx.beginPath(); ctx.moveTo(pa.x,pa.y); ctx.lineTo(pb.x,pb.y);
+        ctx.strokeStyle=`rgba(${r},${g},${b2},${Math.min(.55,(.04+e*.38)*vis)})`;
+        ctx.lineWidth=.4+e*.85; ctx.stroke();
+    });
+    NODES.forEach((n,i)=>{
+        const p=P[i]; if(p.z<-.12) return;
+        const rV=freq[Math.min(n.fi,bins-1)]/255;
+        const boost=n.type==='lo'?bassV*.55:n.type==='hi'?boostV*.55:boostV*.35;
+        const energy=Math.min(1,rV+boost);
+        const vis=Math.max(0,p.z+.18);
+        const dotR=Math.max(.3,(.8+energy*3.8)*vis);
+        const[cr,cg,cb]=n.type==='lo'?[0,210,140]:n.type==='hi'?[170,240,255]:[0,255,210];
+        if(energy>.06){
+            const gw=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,dotR*5);
+            gw.addColorStop(0,`rgba(${cr},${cg},${cb},${energy*.55*vis})`);
+            gw.addColorStop(.4,`rgba(${cr},${cg},${cb},${energy*.12*vis})`);
+            gw.addColorStop(1,'rgba(0,0,0,0)');
+            ctx.beginPath(); ctx.arc(p.x,p.y,dotR*5,0,Math.PI*2); ctx.fillStyle=gw; ctx.fill();
+        }
+        const wm=energy*.85;
+        ctx.beginPath(); ctx.arc(p.x,p.y,dotR,0,Math.PI*2);
+        ctx.fillStyle=`rgba(${Math.round(cr+(255-cr)*wm)},${Math.round(cg+(255-cg)*wm*.4)},${Math.round(cb+(255-cb)*wm*.25)},${Math.min(1,.45+energy*.75)*vis})`;
+        ctx.fill();
+    });
+
+    ctx.restore();
+    const sp=ctx.createRadialGradient(CX-R*.38,CY-R*.38,0,CX,CY,R);
+    sp.addColorStop(0,'rgba(0,255,200,.08)'); sp.addColorStop(.55,'rgba(0,255,200,.01)'); sp.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.beginPath(); ctx.arc(CX,CY,R,0,Math.PI*2); ctx.fillStyle=sp; ctx.fill();
+    ctx.beginPath(); ctx.arc(CX,CY,R,0,Math.PI*2); ctx.strokeStyle='rgba(0,255,204,.32)'; ctx.lineWidth=1.8; ctx.stroke();
+}
+draw();
+
+// ── Block scroll jank ─────────────────────────────────────────────────────────
+vc.addEventListener('touchmove',e=>e.preventDefault(),{passive:false});
+vc.addEventListener('touchstart',e=>e.preventDefault(),{passive:false});
+document.addEventListener('touchmove',e=>{
+    if(e.target.closest('.knob-outer')) return;
+    e.preventDefault();
+},{passive:false});
+</script>
+
+</body>
+</html>
