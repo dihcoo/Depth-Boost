@@ -558,21 +558,22 @@ function buildNodes(){
     voiceNotch4=actx.createBiquadFilter(); voiceNotch4.type='notch'; voiceNotch4.frequency.value=3400; voiceNotch4.Q.value=3;
     voiceMuteGain=actx.createGain(); voiceMuteGain.gain.value=1;
 
-    // ── Sum → soft-knee limiter → master output gain ──────────────────────────
-    // sumNode compensates for 3 parallel paths: divide each by ~1 (paths add to sum)
-    sumNode=actx.createGain(); sumNode.gain.value=0.45;  // mix-down of 3 paths without clipping
+    // ── Sum → transparent limiter → master ────────────────────────────────────
+    // sumNode: 3 paths (series 0.6, parallel 0.4, lo ~0.5) → scale down so sum ≤ 1.0
+    sumNode = actx.createGain(); sumNode.gain.value = 0.55;
 
-    limiter=actx.createDynamicsCompressor();
-    limiter.threshold.value=-6;    // start compressing at -6 dBFS
-    limiter.knee.value=6;          // soft knee for transparent pumping
-    limiter.ratio.value=12;        // 12:1 — strong limiting without brick-wall hardness
-    limiter.attack.value=0.003;
-    limiter.release.value=0.08;
+    // Limiter: transparent ceiling — only catches true peaks, not constant compression
+    limiter = actx.createDynamicsCompressor();
+    limiter.threshold.value = -3;    // only engages near true 0 dBFS
+    limiter.knee.value = 3;          // soft knee, inaudible onset
+    limiter.ratio.value = 20;        // hard limit above threshold
+    limiter.attack.value  = 0.001;   // 1ms — fast enough to catch transients
+    limiter.release.value = 0.15;    // 150ms — slow enough to not pump
 
-    // master output: push final level up so user HEARS the boost
-    masterGain=actx.createGain(); masterGain.gain.value=2.2;
+    // Master: unity. Enhancement comes from EQ, not raw gain.
+    masterGain = actx.createGain(); masterGain.gain.value = 1.0;
 
-    gateGain=actx.createGain(); gateGain.gain.value=0;
+    gateGain = actx.createGain(); gateGain.gain.value = 0;
 }
 
 function wireGraph(withVoiceSuppression){
@@ -648,68 +649,71 @@ function buildGraphFromElement(audioEl){
 
 // ═══════════════════════════════════════════════════════
 //  DSP FUNCTIONS
+//  Philosophy: EQ filters do the enhancement (shelf/peak boosts are perceptually
+//  loud without clipping). Path gains stay near unity. Limiter is a safety net,
+//  not a brick wall being hammered constantly.
 // ═══════════════════════════════════════════════════════
 function setWaveshaper(drive){
-    const n=512, curve=new Float32Array(n);
-    const k = drive * 8;  // scale drive: 0 = clean passthrough, >1 = saturated
-    for(let i=0;i<n;i++){
-        const x=(i*2/n)-1;
-        if(k===0){
-            curve[i]=x;
-        } else {
-            // Modified sigmoid saturation: adds harmonics, increases perceived loudness
-            curve[i] = (Math.PI + k) * x / (Math.PI + k * Math.abs(x));
-        }
+    // Gentle soft-clip saturation — adds warmth/harmonics, not fuzz.
+    // drive 0 = transparent, drive 1 = subtle warmth, never hard-clips.
+    const n = 512, curve = new Float32Array(n);
+    for(let i = 0; i < n; i++){
+        const x = (i * 2 / n) - 1;
+        // Soft-knee tanh-based saturation — stays well within ±1
+        curve[i] = drive < 0.001 ? x : Math.tanh(x * (1 + drive * 2)) / Math.tanh(1 + drive * 2);
     }
-    bbeWave.curve=curve;
+    bbeWave.curve = curve;
 }
 
 function applyBoost(v){
     if(!actx) return;
-    // v = 0..1. At v=1: +18dB hi-shelf, +14dB presence peak, strong saturation,
-    // big linear drive through series+parallel gain paths.
-    const lin = Math.pow(10, (v * 24) / 20); // up to +24dB linear gain factor
+    // DEPTH knob (id=boost): controls BBE hi-def clarity chain
+    // EQ gains do the audible work. Path mix gains stay at unity.
 
-    // BBE 882i Hi-Def: high-shelf boost (air/sparkle above 3.2kHz)
-    bbeHi.gain.value = v * 18;          // 0 to +18 dB
-    // BBE presence peak: punch at 4.8kHz (cuts through mix)
-    bbePresence.gain.value = v * 14;    // 0 to +14 dB
-    // Waveshaper saturation: adds harmonic density, perceived loudness
-    setWaveshaper(v * 1.4);             // more aggressive saturation curve
+    // BBE 882i Hi-Def high-shelf: air and sparkle above 3.2 kHz (+0 to +10 dB)
+    bbeHi.gain.value = v * 10;
+    // BBE presence peak at 4.5 kHz: vocal clarity and cut-through (+0 to +8 dB)
+    bbePresence.gain.value = v * 8;
+    // Waveshaper: subtle harmonic saturation for perceived density (0 to 0.6)
+    setWaveshaper(v * 0.6);
 
-    // FBQ notch depths: deeper cuts = cleaner boost (removes mud before amplifying)
-    const nd = -(v * 9);
+    // FBQ notch: cut muddy resonances before boosting (-0 to -6 dB)
+    const nd = -(v * 6);
     fbqN1.gain.value = nd; fbqN2.gain.value = nd; fbqN3.gain.value = nd;
 
-    // Drive both paths with the linear gain — this is what moves the needle
-    seriesGain.gain.value   = lin * 0.55;
-    parallelGain.gain.value = lin * 0.45;
+    // Path gains: unity blend. Small tilt toward series (has BBE processing).
+    seriesGain.gain.value   = 0.6;
+    parallelGain.gain.value = 0.4;
 }
 
 function applyBass(v){
     if(!actx) return;
-    // v = 0..1. At v=1: +18dB low-shelf (big sub thump), deep AFS lo notches
-    loShelf.gain.value = v * 18;        // 0 to +18 dB low-shelf
-    const nd = -(v * 8);
+    // BOOST knob (id=bass): controls lo contour / sub depth
+    // Low-shelf boost (+0 to +10 dB) — audible but not overloading
+    loShelf.gain.value = v * 10;
+    // AFS lo notches: cut boxy low-mid buildup before boosting
+    const nd = -(v * 5);
     afsLo1.gain.value = nd; afsLo2.gain.value = nd; afsLo3.gain.value = nd;
-    // loGain drives the lo path amplitude
-    loGain.gain.value = 0.3 + v * 1.4; // 0.3 minimum, up to 1.7 at max
+    // loGain: fixed near unity, shelf does the work
+    loGain.gain.value = 0.35 + v * 0.30;  // 0.35 to 0.65
 }
 
 function applyBypass(on){
     if(!actx) return;
     if(on){
+        // Flat passthrough: no EQ, no saturation, unity gains
         bbeHi.gain.value=0; bbePresence.gain.value=0; setWaveshaper(0);
         fbqN1.gain.value=0; fbqN2.gain.value=0; fbqN3.gain.value=0;
-        seriesGain.gain.value=0.55; parallelGain.gain.value=0.45;
-        loShelf.gain.value=0; afsLo1.gain.value=0; afsLo2.gain.value=0; afsLo3.gain.value=0;
-        loGain.gain.value=0.3;
+        seriesGain.gain.value=0.6; parallelGain.gain.value=0.4;
+        loShelf.gain.value=0;
+        afsLo1.gain.value=0; afsLo2.gain.value=0; afsLo3.gain.value=0;
+        loGain.gain.value=0.35;
         masterGain.gain.value=1.0;
     } else {
         applyBoost(getKnobVal('boost')); applyBass(getKnobVal('bass'));
-        masterGain.gain.value=2.2;
+        masterGain.gain.value=1.0;
         if(hpConfirmed && gateGain && actx)
-            gateGain.gain.setTargetAtTime(1,actx.currentTime,0.05);
+            gateGain.gain.setTargetAtTime(1, actx.currentTime, 0.05);
     }
 }
 
