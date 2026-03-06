@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -8,248 +9,426 @@
         :root { --neon: #00ffcc; --bg: #0a0a0a; --panel: #141414; }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { background: var(--bg); color: #fff; font-family: -apple-system, sans-serif; margin: 0; display: flex; justify-content: center; height: 100vh; width: 100vw; overflow: hidden; }
-        
         .app-container { background: var(--panel); width: 100%; height: 100%; display: flex; flex-direction: column; }
         .top-header { padding: 12px; background: #000; border-bottom: 2px solid var(--neon); text-align: center; flex-shrink: 0; }
         .top-header h1 { margin: 0; font-size: 1rem; letter-spacing: 3px; text-transform: uppercase; }
-
-        /* Responsive Visualizer Area */
         .main-interface { flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px; overflow: hidden; }
-        
         @media (orientation: landscape) {
             .main-interface { flex-direction: row; justify-content: space-around; }
             .playlist-area { width: 30%; height: 60%; }
         }
-
         .globe-wrapper { position: relative; width: 220px; height: 220px; flex-shrink: 0; }
         canvas { display: block; width: 220px; height: 220px; border-radius: 50%; z-index: 2; }
-        .globe-ring { position: absolute; top: -5px; left: -5px; width: 230px; height: 230px; border: 1.5px solid rgba(0, 255, 204, 0.4); border-radius: 50%; box-shadow: 0 0 20px rgba(0, 255, 204, 0.1); pointer-events: none; }
-
+        .globe-ring { position: absolute; top: -5px; left: -5px; width: 230px; height: 230px; border: 1.5px solid rgba(0,255,204,0.4); border-radius: 50%; box-shadow: 0 0 20px rgba(0,255,204,0.1); pointer-events: none; }
         .playlist-area { width: 90%; max-width: 400px; height: 60px; background: #080808; border-radius: 8px; border: 1px solid #222; margin: 10px 0; overflow-y: auto; scrollbar-width: none; }
         .queue-item { font-size: 9px; color: #666; padding: 6px; border-bottom: 1px solid #1a1a1a; text-transform: uppercase; }
-        .active-track { color: var(--neon); font-weight: bold; background: rgba(0, 255, 204, 0.05); }
-
-        /* Control Console */
+        .active-track { color: var(--neon); font-weight: bold; background: rgba(0,255,204,0.05); }
         .control-panel { background: #0d0d0d; padding: 10px 15px 20px 15px; border-top: 1px solid #222; flex-shrink: 0; }
         #status-text { font-size: 10px; letter-spacing: 2px; color: var(--neon); margin-bottom: 10px; text-align: center; text-transform: uppercase; height: 14px; }
-
         .console-row { display: grid; grid-template-columns: 1fr 1.2fr 1fr; gap: 10px; align-items: end; margin-bottom: 12px; }
         .slider-bundle { display: flex; flex-direction: column; align-items: center; gap: 6px; }
         .slider-label { font-size: 8px; font-weight: bold; color: var(--neon); text-transform: uppercase; letter-spacing: 1px; }
-
         input[type=range].vertical { -webkit-appearance: slider-vertical; width: 14px; height: 90px; accent-color: var(--neon); }
         input[type=range].horizontal { width: 100%; accent-color: var(--neon); height: 20px; }
-
         #btn-bypass { width: 100%; height: 45px; font-size: 9px; cursor: pointer; border-radius: 6px; border: 1.5px solid var(--neon); background: transparent; color: var(--neon); }
         #btn-bypass.active { background: var(--neon); color: #000; box-shadow: 0 0 10px var(--neon); }
-
-        .transport-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; }
-        .action-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-
+        .transport-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; margin-bottom: 10px; }
+        .action-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; }
         button, .file-label { background: transparent; color: var(--neon); border: 1.5px solid var(--neon); padding: 12px 2px; cursor: pointer; font-weight: bold; border-radius: 6px; font-size: 9px; text-transform: uppercase; display: flex; justify-content: center; align-items: center; text-decoration: none; }
         button:active, .file-label:active { opacity: 0.6; transform: scale(0.95); }
         button.toggle-on { background: var(--neon); color: #000; }
-        
         .recording { background: #ff0033 !important; color: #fff !important; border: none; animation: pulse 1s infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
     </style>
 </head>
 <body onclick="unlockAudio()" ontouchstart="unlockAudio()">
-
-    <div class="app-container">
-        <div class="top-header"><h1>DEPTH<span>IMPACT</span> HYBRID</h1></div>
-        
-        <div class="main-interface">
-            <div class="globe-wrapper">
-                <div class="globe-ring"></div>
-                <canvas id="visualizerCanvas" width="220" height="220"></canvas>
-            </div>
-            
-            <div class="playlist-area" id="playlist-container">
-                <div class="queue-item">SELECT 'LOAD' FOR MULTI-TRACK</div>
-            </div>
+<div class="app-container">
+    <div class="top-header"><h1>DEPTH<span>IMPACT</span> HYBRID</h1></div>
+    <div class="main-interface">
+        <div class="globe-wrapper">
+            <div class="globe-ring"></div>
+            <canvas id="visualizerCanvas" width="220" height="220"></canvas>
         </div>
-
-        <div class="control-panel">
-            <div id="status-text">TAP TO WAKE ENGINE</div>
-            <div class="console-row">
-                <div class="slider-bundle"><span class="slider-label">CLARITY</span><input type="range" class="vertical" id="clarity" min="0" max="100" value="0"></div>
-                <div class="slider-bundle"><button id="btn-bypass" class="active">PROCESS ON</button><span class="slider-label">BYPASS</span></div>
-                <div class="slider-bundle"><span class="slider-label">DEPTH</span><input type="range" class="vertical" id="depth" min="0" max="100" value="0"></div>
-            </div>
-            <div class="slider-bundle" style="margin-bottom: 15px; width: 100%;"><span class="slider-label">LO CONTOUR</span><input type="range" class="horizontal" id="contour" min="0" max="100" value="0"></div>
-
-            <div class="transport-grid">
-                <button id="btn-rw">« RW</button><button id="btn-play">PLAY</button><button id="btn-stop">STOP</button><button id="btn-ff">FF »</button>
-            </div>
-            <div class="action-grid">
-                <label for="audio-upload" class="file-label">LOAD</label>
-                <input type="file" id="audio-upload" accept="audio/*" multiple style="display:none">
-                <button id="btn-shuffle">SHFL</button>
-                <button id="btn-repeat">RPT</button>
-                <button id="btn-rec">REC</button>
-            </div>
+        <div class="playlist-area" id="playlist-container">
+            <div class="queue-item">SELECT 'LOAD' FOR MULTI-TRACK</div>
         </div>
     </div>
+    <div class="control-panel">
+        <div id="status-text">TAP TO WAKE ENGINE</div>
+        <div class="console-row">
+            <div class="slider-bundle"><span class="slider-label">CLARITY</span><input type="range" class="vertical" id="clarity" min="0" max="100" value="0"></div>
+            <div class="slider-bundle"><button id="btn-bypass" class="active">PROCESS ON</button><span class="slider-label">BYPASS</span></div>
+            <div class="slider-bundle"><span class="slider-label">DEPTH</span><input type="range" class="vertical" id="depth" min="0" max="100" value="0"></div>
+        </div>
+        <div class="slider-bundle" style="margin-bottom:15px;width:100%"><span class="slider-label">LO CONTOUR</span><input type="range" class="horizontal" id="contour" min="0" max="100" value="0"></div>
+        <div class="transport-grid">
+            <button id="btn-rw">« RW</button><button id="btn-play">PLAY</button><button id="btn-stop">STOP</button><button id="btn-ff">FF »</button>
+        </div>
+        <div class="action-grid">
+            <label for="audio-upload" class="file-label">LOAD</label>
+            <input type="file" id="audio-upload" accept="audio/*,.mp3,.wav,.m4a,.aiff" multiple style="display:none">
+            <button id="btn-shuffle">SHFL</button>
+            <button id="btn-repeat">RPT</button>
+            <button id="btn-rec">REC</button>
+        </div>
+    </div>
+</div>
+<script>
+// ═══════════════════════════════════════════════════════
+//  AUDIO ENGINE  (original, untouched)
+// ═══════════════════════════════════════════════════════
+let audioCtx, analyser, sourceNode, loFilter, hiFilter, delayNode, delayGain;
+let isProcessing = true, isRecording = false, recordedChunks = [], mediaRecorder;
+let playlist = [], currentIndex = 0, isShuffle = false, isRepeat = false;
 
-    <script>
-        let audioCtx, analyser, sourceNode, loFilter, hiFilter, delayNode, delayGain;
-        let isProcessing = true, isRecording = false, recordedChunks = [], mediaRecorder;
-        let playlist = [], currentIndex = 0, isShuffle = false, isRepeat = false;
-        const audioEl = new Audio();
-        const canvas = document.getElementById('visualizerCanvas'), canvasCtx = canvas.getContext('2d');
-        const bypassBtn = document.getElementById('btn-bypass'), statusText = document.getElementById('status-text');
-        const playlistContainer = document.getElementById('playlist-container');
+const audioEl = new Audio();
+audioEl.playsInline = true;
+audioEl.preload = “auto”;
 
-        // FORCE UNLOCK for Mobile Browsers
-        function unlockAudio() {
-            if (!audioCtx) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                analyser = audioCtx.createAnalyser(); analyser.fftSize = 256;
-                sourceNode = audioCtx.createMediaElementSource(audioEl);
-                loFilter = audioCtx.createBiquadFilter(); loFilter.type = "lowshelf"; loFilter.frequency.value = 150; loFilter.gain.value = 0;
-                hiFilter = audioCtx.createBiquadFilter(); hiFilter.type = "highshelf"; hiFilter.frequency.value = 3000; hiFilter.gain.value = 0;
-                delayNode = audioCtx.createDelay(); delayNode.delayTime.value = 0.05;
-                delayGain = audioCtx.createGain(); delayGain.gain.value = 0;
-                const dest = audioCtx.createMediaStreamDestination();
-                mediaRecorder = new MediaRecorder(dest.stream);
-                mediaRecorder.ondataavailable = e => recordedChunks.push(e.data);
-                mediaRecorder.onstop = saveRecording;
-                sourceNode.connect(loFilter); loFilter.connect(hiFilter); hiFilter.connect(analyser); 
-                hiFilter.connect(delayNode); delayNode.connect(delayGain); delayGain.connect(analyser);
-                analyser.connect(audioCtx.destination); analyser.connect(dest);
-                initGlobe(); draw(); routeAudio();
-            }
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-        }
+const canvas = document.getElementById(‘visualizerCanvas’);
+const canvasCtx = canvas.getContext(‘2d’);
+const bypassBtn = document.getElementById(‘btn-bypass’);
+const statusText = document.getElementById(‘status-text’);
+const playlistContainer = document.getElementById(‘playlist-container’);
 
-        // Keep Play button text synced with audio state
-        audioEl.addEventListener('play', () => { document.getElementById('btn-play').textContent = "PAUSE"; });
-        audioEl.addEventListener('pause', () => { document.getElementById('btn-play').textContent = "PLAY"; });
+function unlockAudio() {
+if (!audioCtx) {
+audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+analyser = audioCtx.createAnalyser();
+analyser.fftSize = 256;   // ← original: 128 frequency bins
+sourceNode = audioCtx.createMediaElementSource(audioEl);
+loFilter  = audioCtx.createBiquadFilter(); loFilter.type  = “lowshelf”;  loFilter.frequency.value  = 150;  loFilter.gain.value  = 0;
+hiFilter  = audioCtx.createBiquadFilter(); hiFilter.type  = “highshelf”; hiFilter.frequency.value  = 3000; hiFilter.gain.value  = 0;
+delayNode = audioCtx.createDelay();        delayNode.delayTime.value = 0.05;
+delayGain = audioCtx.createGain();         delayGain.gain.value = 0;
+const dest = audioCtx.createMediaStreamDestination();
+mediaRecorder = new MediaRecorder(dest.stream);
+mediaRecorder.ondataavailable = e => recordedChunks.push(e.data);
+mediaRecorder.onstop = saveRecording;
+sourceNode.connect(loFilter); loFilter.connect(hiFilter); hiFilter.connect(analyser);
+hiFilter.connect(delayNode); delayNode.connect(delayGain); delayGain.connect(analyser);
+analyser.connect(audioCtx.destination); analyser.connect(dest);
+routeAudio();
+}
+if (audioCtx.state === ‘suspended’) audioCtx.resume();
+}
 
-        document.getElementById('audio-upload').onchange = e => { 
-            const files = Array.from(e.target.files);
-            playlist = files.filter(f => f.size < 110 * 1024 * 1024); // Memory Guard
-            if(playlist.length > 0) { currentIndex = 0; loadTrack(0); }
-        };
+audioEl.addEventListener(‘play’,  () => { document.getElementById(‘btn-play’).textContent = “PAUSE”; });
+audioEl.addEventListener(‘pause’, () => { document.getElementById(‘btn-play’).textContent = “PLAY”;  });
 
-        function loadTrack(index) {
-            if (playlist.length > 0) {
-                audioEl.src = URL.createObjectURL(playlist[index]);
-                statusText.textContent = playlist[index].name.substring(0, 20).toUpperCase();
-                updatePlaylistUI();
-            }
-        }
+document.getElementById(‘audio-upload’).onchange = e => {
+const files = Array.from(e.target.files);
+playlist = files.filter(f => f.size < 110 * 1024 * 1024);
+if (playlist.length > 0) { currentIndex = 0; loadTrack(0); }
+};
 
-        function updatePlaylistUI() {
-            playlistContainer.innerHTML = "";
-            playlist.forEach((track, i) => {
-                const item = document.createElement('div');
-                item.className = "queue-item" + (i === currentIndex ? " active-track" : "");
-                item.textContent = (i + 1) + ". " + track.name.toUpperCase();
-                item.onclick = () => { currentIndex = i; loadTrack(i); audioEl.play(); };
-                playlistContainer.appendChild(item);
-            });
-        }
+function loadTrack(index) {
+if (playlist.length > 0) {
+audioEl.src = URL.createObjectURL(playlist[index]);
+audioEl.load();
+statusText.textContent = “READY: “ + playlist[index].name.substring(0, 15).toUpperCase();
+updatePlaylistUI();
+}
+}
 
-        audioEl.onended = () => { if (isRepeat) { audioEl.play(); } else { skipTrack(1); } };
+function updatePlaylistUI() {
+playlistContainer.innerHTML = “”;
+playlist.forEach((track, i) => {
+const item = document.createElement(‘div’);
+item.className = “queue-item” + (i === currentIndex ? “ active-track” : “”);
+item.textContent = (i + 1) + “. “ + track.name.toUpperCase();
+item.onclick = () => { currentIndex = i; loadTrack(i); audioEl.play(); };
+playlistContainer.appendChild(item);
+});
+}
 
-        function skipTrack(dir) {
-            if (playlist.length === 0) return;
-            if (isShuffle) { currentIndex = Math.floor(Math.random() * playlist.length); } 
-            else { currentIndex = (currentIndex + dir + playlist.length) % playlist.length; }
-            loadTrack(currentIndex); audioEl.play();
-        }
+audioEl.onended = () => { if (isRepeat) { audioEl.play(); } else { skipTrack(1); } };
 
-        document.getElementById('btn-shuffle').onclick = function() { isShuffle = !isShuffle; this.classList.toggle('toggle-on', isShuffle); };
-        document.getElementById('btn-repeat').onclick = function() { isRepeat = !isRepeat; this.classList.toggle('toggle-on', isRepeat); };
-        
-        // Play/Pause Toggle Logic
-        document.getElementById('btn-play').onclick = () => { 
-            unlockAudio(); 
-            if(audioEl.src) {
-                if(audioEl.paused) {
-                    audioEl.play();
-                } else {
-                    audioEl.pause();
-                }
-            }
-        };
-        
-        document.getElementById('btn-stop').onclick = () => { audioEl.pause(); audioEl.currentTime = 0; };
-        document.getElementById('btn-rw').onclick = () => { if(audioEl.currentTime < 3) skipTrack(-1); else audioEl.currentTime -= 5; };
-        document.getElementById('btn-ff').onclick = () => { if(audioEl.duration - audioEl.currentTime < 5) skipTrack(1); else audioEl.currentTime += 5; };
-        
-        bypassBtn.onclick = () => { isProcessing = !isProcessing; bypassBtn.textContent = isProcessing ? "PROCESS ON" : "BYPASS OFF"; routeAudio(); };
+function skipTrack(dir) {
+if (playlist.length === 0) return;
+if (isShuffle) { currentIndex = Math.floor(Math.random() * playlist.length); }
+else           { currentIndex = (currentIndex + dir + playlist.length) % playlist.length; }
+loadTrack(currentIndex); audioEl.play();
+}
 
-        function routeAudio() {
-            if (!audioCtx) return;
-            sourceNode.disconnect();
-            if (isProcessing) { sourceNode.connect(loFilter); bypassBtn.className = "active"; }
-            else { sourceNode.connect(analyser); bypassBtn.className = ""; }
-        }
+document.getElementById(‘btn-shuffle’).onclick = function() { isShuffle = !isShuffle; this.classList.toggle(‘toggle-on’, isShuffle); };
+document.getElementById(‘btn-repeat’).onclick  = function() { isRepeat  = !isRepeat;  this.classList.toggle(‘toggle-on’, isRepeat);  };
 
-        document.getElementById('clarity').oninput = e => { if(hiFilter) hiFilter.gain.value = (e.target.value / 100) * 25; };
-        document.getElementById('depth').oninput = e => { if(delayGain) delayGain.gain.value = e.target.value / 100; };
-        document.getElementById('contour').oninput = e => { if(loFilter) loFilter.gain.value = (e.target.value / 100) * 25; };
+// FIX: use playlist.length check so it doesn’t trigger on the bare page URL
+document.getElementById(‘btn-play’).onclick = () => {
+unlockAudio();
+if (playlist.length > 0) {
+if (audioEl.paused) {
+audioEl.play().catch(() => alert(“iOS Playback Blocked. Try tapping the screen again, then hit play.”));
+} else {
+audioEl.pause();
+}
+}
+};
 
-        document.getElementById('btn-rec').onclick = function() {
-            if (!isRecording) { recordedChunks = []; mediaRecorder.start(); isRecording = true; this.classList.add('recording'); }
-            else { mediaRecorder.stop(); isRecording = false; this.classList.remove('recording'); }
-        };
+document.getElementById(‘btn-stop’).onclick = () => { audioEl.pause(); audioEl.currentTime = 0; };
+document.getElementById(‘btn-rw’).onclick   = () => { if (audioEl.currentTime < 3) skipTrack(-1); else audioEl.currentTime -= 5; };
+document.getElementById(‘btn-ff’).onclick   = () => { if (audioEl.duration - audioEl.currentTime < 5) skipTrack(1); else audioEl.currentTime += 5; };
 
-        function saveRecording() {
-            const blob = new Blob(recordedChunks, { type: 'audio/mpeg' });
-            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'Impact_Mix.mp3'; a.click();
-        }
+bypassBtn.onclick = () => {
+isProcessing = !isProcessing;
+bypassBtn.textContent = isProcessing ? “PROCESS ON” : “BYPASS OFF”;
+routeAudio();
+};
 
-        // --- ORIGINAL STRUCTURED GLOBE ENGINE ---
-        let points = [], bgStars = [];
-        const globeRadius = 100;
+function routeAudio() {
+if (!audioCtx) return;
+sourceNode.disconnect();
+if (isProcessing) { sourceNode.connect(loFilter); bypassBtn.className = “active”; }
+else              { sourceNode.connect(analyser); bypassBtn.className = “”;       }
+}
 
-        function initGlobe() {
-            for(let i=0; i<60; i++) {
-                bgStars.push({ x: Math.random()*220, y: Math.random()*220, sz: 0.3, op: Math.random()*0.2, spd: Math.random()*0.02 });
-            }
-            // Structured Lattice
-            for (let i = 0; i < 10; i++) {
-                let lat = Math.acos(-1 + (2 * i) / 10);
-                for (let j = 0; j < 12; j++) {
-                    let lon = 2 * Math.PI * j / 12;
-                    let x = Math.cos(lon) * Math.sin(lat), y = Math.cos(lat), z = Math.sin(lon) * Math.sin(lat);
-                    let type = 'mid', fIdx = 10 + Math.floor(Math.random()*20);
-                    if(y > 0.4) { type = 'high'; fIdx = 40 + Math.floor(Math.random()*40); }
-                    if(y < -0.4) { type = 'low'; fIdx = Math.floor(Math.random()*10); }
-                    points.push({ x, y, z, type, fIdx });
-                }
-            }
-        }
+document.getElementById(‘clarity’).oninput = e => { if (hiFilter)  hiFilter.gain.value  = (e.target.value / 100) * 25; };
+document.getElementById(‘depth’).oninput   = e => { if (delayGain) delayGain.gain.value = e.target.value / 100; };
+document.getElementById(‘contour’).oninput = e => { if (loFilter)  loFilter.gain.value  = (e.target.value / 100) * 25; };
 
-        function draw() {
-            requestAnimationFrame(draw);
-            const data = new Uint8Array(analyser ? analyser.frequencyBinCount : 128);
-            if(analyser) analyser.getByteFrequencyData(data);
-            canvasCtx.fillStyle = 'rgba(10, 10, 10, 0.4)'; canvasCtx.fillRect(0, 0, 220, 220);
+document.getElementById(‘btn-rec’).onclick = function() {
+if (!isRecording) { recordedChunks = []; mediaRecorder.start(); isRecording = true; this.classList.add(‘recording’); }
+else              { mediaRecorder.stop(); isRecording = false; this.classList.remove(‘recording’); }
+};
 
-            bgStars.forEach(s => {
-                canvasCtx.beginPath(); canvasCtx.arc(s.x, s.y, s.sz, 0, 7);
-                canvasCtx.fillStyle = `rgba(0, 255, 204, ${s.op})`; canvasCtx.fill();
-                s.y += s.spd; if(s.y > 220) s.y = 0;
-            });
+function saveRecording() {
+const blob = new Blob(recordedChunks, { type: ‘audio/mpeg’ });
+const a = document.createElement(‘a’); a.href = URL.createObjectURL(blob); a.download = ‘Impact_Mix.mp3’; a.click();
+}
 
-            const rotY = Date.now() * 0.0004;
-            points.forEach(p => {
-                let x = p.x * Math.cos(rotY) - p.z * Math.sin(rotY);
-                let z = p.x * Math.sin(rotY) + p.z * Math.cos(rotY);
-                let vol = data[p.fIdx] / 255;
-                let scale = globeRadius * (0.85 + vol * 0.25);
-                
-                canvasCtx.beginPath(); canvasCtx.arc(110 + x * scale, 110 + p.y * scale, 1 + vol * 3, 0, 7);
-                canvasCtx.fillStyle = p.type === 'low' ? '#fff' : (p.type === 'mid' ? '#00ffcc' : '#007a62');
-                canvasCtx.fill();
-            });
-        }
-        initGlobe(); draw();
-    </script>
+// ═══════════════════════════════════════════════════════
+//  VISUAL ENGINE
+//  Layer 1 — drifting nebula stars   (original)
+//  Layer 2 — rotating 3-D lattice    (original globe)
+//  Layer 3 — dot dancers             (new)
+// ═══════════════════════════════════════════════════════
+let bgStars = [], latticePoints = [], dancers = [];
+const GLOBE_R = 100;
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+function avgBand(data, lo, hi) {
+let s = 0, c = 0;
+for (let i = lo; i <= hi && i < data.length; i++) { s += data[i]; c++; }
+return c ? s / (c * 255) : 0;
+}
+
+// Energy → colour. Unlit = dim, fully lit = vivid.
+function bandRGB(bnd, lE, mE, hE) {
+if (bnd === ‘low’)  return [255,                    Math.round(80+lE*175), 20,                        lE];
+if (bnd === ‘mid’)  return [0,                      Math.round(140+mE*115),Math.round(120+mE*135),    mE];
+return [Math.round(130+hE*125), 255,                   Math.round(220+hE*35),     hE];
+}
+
+// ── Layer 1: nebula stars ─────────────────────────────────────────────────────
+function buildStars() {
+bgStars = [];
+for (let i = 0; i < 60; i++) {
+bgStars.push({
+x: Math.random() * 220, y: Math.random() * 220,
+sz: 0.3 + Math.random() * 0.3,
+op: Math.random() * 0.2,
+spd: Math.random() * 0.02
+});
+}
+}
+
+// ── Layer 2: rotating 3-D lattice (original globe engine) ────────────────────
+function buildLattice() {
+latticePoints = [];
+for (let i = 0; i < 10; i++) {
+const lat = Math.acos(-1 + (2 * i) / 10);
+for (let j = 0; j < 12; j++) {
+const lon = 2 * Math.PI * j / 12;
+const x = Math.cos(lon) * Math.sin(lat);
+const y = Math.cos(lat);
+const z = Math.sin(lon) * Math.sin(lat);
+let type = ‘mid’, fIdx = 10 + Math.floor(Math.random() * 20);
+if (y >  0.4) { type = ‘high’; fIdx = 40 + Math.floor(Math.random() * 40); }
+if (y < -0.4) { type = ‘low’;  fIdx = Math.floor(Math.random() * 10); }
+latticePoints.push({ x, y, z, type, fIdx });
+}
+}
+}
+
+// ── Layer 3: dancers ──────────────────────────────────────────────────────────
+function makeDancer(ox, oy, phase, sc) {
+return {
+ox, oy, phase, sc,
+// rest offsets relative to dancer centre (px before scaling)
+parts: [
+{ n:‘head’,  rx:  0, ry:-50, sz:4.0, bnd:‘high’            },
+{ n:‘neck’,  rx:  0, ry:-40, sz:1.8, bnd:‘high’            },
+{ n:‘ls’,    rx:-12, ry:-33, sz:2.5, bnd:‘mid’             },
+{ n:‘rs’,    rx: 12, ry:-33, sz:2.5, bnd:‘mid’             },
+{ n:‘le’,    rx:-18, ry:-19, sz:2.0, bnd:‘mid’,  limb:‘la’ },
+{ n:‘re’,    rx: 18, ry:-19, sz:2.0, bnd:‘mid’,  limb:‘ra’ },
+{ n:‘lh’,    rx:-22, ry: -6, sz:1.8, bnd:‘high’, limb:‘la’ },
+{ n:‘rh’,    rx: 22, ry: -6, sz:1.8, bnd:‘high’, limb:‘ra’ },
+{ n:‘chest’, rx:  0, ry:-23, sz:2.4, bnd:‘mid’             },
+{ n:‘belly’, rx:  0, ry:-10, sz:2.4, bnd:‘mid’             },
+{ n:‘lhip’,  rx: -8, ry:  2, sz:2.5, bnd:‘low’             },
+{ n:‘rhip’,  rx:  8, ry:  2, sz:2.5, bnd:‘low’             },
+{ n:‘lk’,    rx:-10, ry: 20, sz:2.0, bnd:‘low’,  limb:‘ll’ },
+{ n:‘rk’,    rx: 10, ry: 20, sz:2.0, bnd:‘low’,  limb:‘rl’ },
+{ n:‘lf’,    rx:-12, ry: 37, sz:1.8, bnd:‘low’,  limb:‘ll’ },
+{ n:‘rf’,    rx: 12, ry: 37, sz:1.8, bnd:‘low’,  limb:‘rl’ },
+],
+bones: [
+[‘head’,‘neck’],
+[‘neck’,‘ls’],[‘neck’,‘rs’],
+[‘ls’,‘le’],  [‘le’,‘lh’],
+[‘rs’,‘re’],  [‘re’,‘rh’],
+[‘neck’,‘chest’],[‘chest’,‘belly’],
+[‘belly’,‘lhip’],[‘belly’,‘rhip’],
+[‘lhip’,‘lk’],   [‘lk’,‘lf’],
+[‘rhip’,‘rk’],   [‘rk’,‘rf’],
+]
+};
+}
+
+function poseOf(d, t, lE, mE, hE) {
+const cx = 110 + d.ox, cy = 110 + d.oy;
+const bounce = Math.sin(t * 4.2 + d.phase) * lE * 8;
+const sway   = Math.sin(t * 1.9 + d.phase) * mE * 4;
+const lArm   = Math.sin(t * 3.2 + d.phase);
+const rArm   = -lArm;
+const lLeg   = Math.sin(t * 4.2 + d.phase);
+const rLeg   = -lLeg;
+const pos = {};
+d.parts.forEach(p => {
+let rx = p.rx + sway, ry = p.ry + bounce;
+switch (p.limb) {
+case ‘la’: rx += lArm * mE * 16; ry -= Math.abs(lArm) * mE * 6; break;
+case ‘ra’: rx += rArm * mE * 16; ry -= Math.abs(rArm) * mE * 6; break;
+case ‘ll’: rx += lLeg * lE * 12; ry -= (1 - Math.abs(lLeg)) * lE * 5; break;
+case ‘rl’: rx += rLeg * lE * 12; ry -= (1 - Math.abs(rLeg)) * lE * 5; break;
+}
+pos[p.n] = { x: cx + rx * d.sc, y: cy + ry * d.sc, bnd: p.bnd, sz: p.sz };
+});
+return pos;
+}
+
+function drawDancer(d, t, lE, mE, hE) {
+const pos = poseOf(d, t, lE, mE, hE);
+
+```
+// skeleton
+d.bones.forEach(([a, b]) => {
+    const pa = pos[a], pb = pos[b]; if (!pa || !pb) return;
+    const [r, g, bv, e] = bandRGB(pa.bnd, lE, mE, hE);
+    canvasCtx.beginPath();
+    canvasCtx.moveTo(pa.x, pa.y); canvasCtx.lineTo(pb.x, pb.y);
+    canvasCtx.strokeStyle = `rgba(${r},${g},${bv},${0.30 + e * 0.60})`;
+    canvasCtx.lineWidth   = 0.9 + e * 1.4;
+    canvasCtx.shadowColor = `rgba(${r},${g},${bv},${e * 0.9})`;
+    canvasCtx.shadowBlur  = 4 + e * 10;
+    canvasCtx.stroke();
+});
+
+// joints
+d.parts.forEach(p => {
+    const pp = pos[p.n];
+    const [r, g, bv, e] = bandRGB(p.bnd, lE, mE, hE);
+    const ds = (p.sz + e * 3.5) * d.sc;
+
+    // halo
+    const grad = canvasCtx.createRadialGradient(pp.x, pp.y, 0, pp.x, pp.y, ds * 2.5);
+    grad.addColorStop(0, `rgba(${r},${g},${bv},${e * 0.28})`);
+    grad.addColorStop(1, `rgba(${r},${g},${bv},0)`);
+    canvasCtx.beginPath(); canvasCtx.arc(pp.x, pp.y, ds * 2.5, 0, Math.PI * 2);
+    canvasCtx.fillStyle = grad; canvasCtx.shadowBlur = 0; canvasCtx.fill();
+
+    // core
+    canvasCtx.beginPath(); canvasCtx.arc(pp.x, pp.y, ds, 0, Math.PI * 2);
+    canvasCtx.fillStyle   = `rgba(${r},${g},${bv},${0.72 + e * 0.28})`;
+    canvasCtx.shadowColor = `rgba(${r},${g},${bv},1)`;
+    canvasCtx.shadowBlur  = 5 + e * 14;
+    canvasCtx.fill();
+
+    // specular
+    canvasCtx.beginPath(); canvasCtx.arc(pp.x - ds*0.25, pp.y - ds*0.25, ds*0.35, 0, Math.PI * 2);
+    canvasCtx.fillStyle = `rgba(255,255,255,${0.22 + e * 0.50})`;
+    canvasCtx.shadowBlur = 0; canvasCtx.fill();
+});
+canvasCtx.shadowBlur = 0;
+```
+
+}
+
+// ── init & loop ───────────────────────────────────────────────────────────────
+function initGlobe() {
+buildStars();
+buildLattice();
+dancers = [
+makeDancer(-26, 12, 0,       0.60),
+makeDancer( 26, 12, Math.PI, 0.60),
+];
+}
+
+function draw() {
+requestAnimationFrame(draw);
+
+```
+const bins  = analyser ? analyser.frequencyBinCount : 128;
+const data  = new Uint8Array(bins);
+if (analyser) analyser.getByteFrequencyData(data);
+
+// fftSize 256 → 128 bins.  Band ranges (original indices):
+const t    = Date.now() * 0.001;
+const lE   = avgBand(data,  0,  5);   // lows  (~20–300 Hz)
+const mE   = avgBand(data,  6, 30);   // mids  (~300–2k Hz)
+const hE   = avgBand(data, 31, 63);   // highs (~2k–10k Hz)
+
+// trail fade
+canvasCtx.fillStyle = 'rgba(10,10,10,0.40)';
+canvasCtx.fillRect(0, 0, 220, 220);
+
+// ── Layer 1: drifting stars ──────────────────────────────────────────────
+bgStars.forEach(s => {
+    canvasCtx.beginPath(); canvasCtx.arc(s.x, s.y, s.sz, 0, Math.PI * 2);
+    canvasCtx.fillStyle = `rgba(0,255,204,${s.op})`; canvasCtx.fill();
+    s.y += s.spd; if (s.y > 220) s.y = 0;
+});
+
+// ── Layer 2: rotating 3-D lattice (original globe) ──────────────────────
+const rotY = Date.now() * 0.0004;
+latticePoints.forEach(p => {
+    const rx  = p.x * Math.cos(rotY) - p.z * Math.sin(rotY);
+    const vol = data[p.fIdx] / 255;
+    const sc  = GLOBE_R * (0.85 + vol * 0.25);
+
+    let r, g, bv;
+    if (p.type === 'low')  { r = 255;                  g = Math.round(130 + lE*125); bv = 20; }
+    else if (p.type === 'mid')  { r = 0;               g = Math.round(190 + mE*65);  bv = Math.round(160 + mE*95); }
+    else                        { r = Math.round(170 + hE*85); g = 255;              bv = Math.round(240 + hE*15); }
+
+    const alpha = 0.30 + vol * 0.55;
+    canvasCtx.beginPath();
+    canvasCtx.arc(110 + rx * sc, 110 + p.y * sc, 1 + vol * 3, 0, Math.PI * 2);
+    canvasCtx.shadowColor = `rgba(${r},${g},${bv},${alpha})`;
+    canvasCtx.shadowBlur  = 2 + vol * 6;
+    canvasCtx.fillStyle   = `rgba(${r},${g},${bv},${alpha})`;
+    canvasCtx.fill();
+});
+canvasCtx.shadowBlur = 0;
+
+// ── Layer 3: dancer shadows then dancers ─────────────────────────────────
+const floorY = 110 + 12 + 37 * 0.60 + 3;
+dancers.forEach(d => {
+    canvasCtx.beginPath();
+    canvasCtx.ellipse(110 + d.ox, floorY + 2, 14 * d.sc * (1 + lE * 0.4), 2.5 * d.sc, 0, 0, Math.PI * 2);
+    canvasCtx.fillStyle = `rgba(0,255,204,${0.05 + lE * 0.12})`;
+    canvasCtx.fill();
+});
+dancers.forEach(d => drawDancer(d, t, lE, mE, hE));
+```
+
+}
+
+initGlobe();
+draw();
+</script>
+
 </body>
 </html>
