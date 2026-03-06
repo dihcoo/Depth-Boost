@@ -123,6 +123,10 @@
             if (audioCtx.state === 'suspended') audioCtx.resume();
         }
 
+        // Keep Play button text synced with audio state
+        audioEl.addEventListener('play', () => { document.getElementById('btn-play').textContent = "PAUSE"; });
+        audioEl.addEventListener('pause', () => { document.getElementById('btn-play').textContent = "PLAY"; });
+
         document.getElementById('audio-upload').onchange = e => { 
             const files = Array.from(e.target.files);
             playlist = files.filter(f => f.size < 110 * 1024 * 1024); // Memory Guard
@@ -159,7 +163,19 @@
 
         document.getElementById('btn-shuffle').onclick = function() { isShuffle = !isShuffle; this.classList.toggle('toggle-on', isShuffle); };
         document.getElementById('btn-repeat').onclick = function() { isRepeat = !isRepeat; this.classList.toggle('toggle-on', isRepeat); };
-        document.getElementById('btn-play').onclick = () => { unlockAudio(); if(audioEl.src) audioEl.play(); };
+        
+        // Play/Pause Toggle Logic
+        document.getElementById('btn-play').onclick = () => { 
+            unlockAudio(); 
+            if(audioEl.src) {
+                if(audioEl.paused) {
+                    audioEl.play();
+                } else {
+                    audioEl.pause();
+                }
+            }
+        };
+        
         document.getElementById('btn-stop').onclick = () => { audioEl.pause(); audioEl.currentTime = 0; };
         document.getElementById('btn-rw').onclick = () => { if(audioEl.currentTime < 3) skipTrack(-1); else audioEl.currentTime -= 5; };
         document.getElementById('btn-ff').onclick = () => { if(audioEl.duration - audioEl.currentTime < 5) skipTrack(1); else audioEl.currentTime += 5; };
