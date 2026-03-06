@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -21,7 +20,7 @@
         canvas { display: block; width: 220px; height: 220px; border-radius: 50%; z-index: 2; }
         .globe-ring { position: absolute; top: -5px; left: -5px; width: 230px; height: 230px; border: 1.5px solid rgba(0,255,204,0.4); border-radius: 50%; box-shadow: 0 0 20px rgba(0,255,204,0.1); pointer-events: none; }
         .playlist-area { width: 90%; max-width: 400px; height: 60px; background: #080808; border-radius: 8px; border: 1px solid #222; margin: 10px 0; overflow-y: auto; scrollbar-width: none; }
-        .queue-item { font-size: 9px; color: #666; padding: 6px; border-bottom: 1px solid #1a1a1a; text-transform: uppercase; }
+        .queue-item { font-size: 9px; color: #666; padding: 6px; border-bottom: 1px solid #1a1a1a; text-transform: uppercase; cursor: pointer; }
         .active-track { color: var(--neon); font-weight: bold; background: rgba(0,255,204,0.05); }
         .control-panel { background: #0d0d0d; padding: 10px 15px 20px 15px; border-top: 1px solid #222; flex-shrink: 0; }
         #status-text { font-size: 10px; letter-spacing: 2px; color: var(--neon); margin-bottom: 10px; text-align: center; text-transform: uppercase; height: 14px; }
@@ -75,7 +74,7 @@
 </div>
 <script>
 // ═══════════════════════════════════════════════════════
-//  AUDIO ENGINE  (original, untouched)
+//  AUDIO ENGINE
 // ═══════════════════════════════════════════════════════
 let audioCtx, analyser, sourceNode, loFilter, hiFilter, delayNode, delayGain;
 let isProcessing = true, isRecording = false, recordedChunks = [], mediaRecorder;
@@ -83,352 +82,321 @@ let playlist = [], currentIndex = 0, isShuffle = false, isRepeat = false;
 
 const audioEl = new Audio();
 audioEl.playsInline = true;
-audioEl.preload = “auto”;
+audioEl.preload = "auto";
 
-const canvas = document.getElementById(‘visualizerCanvas’);
-const canvasCtx = canvas.getContext(‘2d’);
-const bypassBtn = document.getElementById(‘btn-bypass’);
-const statusText = document.getElementById(‘status-text’);
-const playlistContainer = document.getElementById(‘playlist-container’);
+const canvas = document.getElementById('visualizerCanvas');
+const canvasCtx = canvas.getContext('2d');
+const bypassBtn = document.getElementById('btn-bypass');
+const statusText = document.getElementById('status-text');
+const playlistContainer = document.getElementById('playlist-container');
 
 function unlockAudio() {
-if (!audioCtx) {
-audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-analyser = audioCtx.createAnalyser();
-analyser.fftSize = 256;   // ← original: 128 frequency bins
-sourceNode = audioCtx.createMediaElementSource(audioEl);
-loFilter  = audioCtx.createBiquadFilter(); loFilter.type  = “lowshelf”;  loFilter.frequency.value  = 150;  loFilter.gain.value  = 0;
-hiFilter  = audioCtx.createBiquadFilter(); hiFilter.type  = “highshelf”; hiFilter.frequency.value  = 3000; hiFilter.gain.value  = 0;
-delayNode = audioCtx.createDelay();        delayNode.delayTime.value = 0.05;
-delayGain = audioCtx.createGain();         delayGain.gain.value = 0;
-const dest = audioCtx.createMediaStreamDestination();
-mediaRecorder = new MediaRecorder(dest.stream);
-mediaRecorder.ondataavailable = e => recordedChunks.push(e.data);
-mediaRecorder.onstop = saveRecording;
-sourceNode.connect(loFilter); loFilter.connect(hiFilter); hiFilter.connect(analyser);
-hiFilter.connect(delayNode); delayNode.connect(delayGain); delayGain.connect(analyser);
-analyser.connect(audioCtx.destination); analyser.connect(dest);
-routeAudio();
-}
-if (audioCtx.state === ‘suspended’) audioCtx.resume();
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
 }
 
-audioEl.addEventListener(‘play’,  () => { document.getElementById(‘btn-play’).textContent = “PAUSE”; });
-audioEl.addEventListener(‘pause’, () => { document.getElementById(‘btn-play’).textContent = “PLAY”;  });
+async function ensureAudio() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        analyser  = audioCtx.createAnalyser(); analyser.fftSize = 256;
+        sourceNode = audioCtx.createMediaElementSource(audioEl);
+        loFilter  = audioCtx.createBiquadFilter(); loFilter.type  = 'lowshelf';  loFilter.frequency.value = 150;  loFilter.gain.value = 0;
+        hiFilter  = audioCtx.createBiquadFilter(); hiFilter.type  = 'highshelf'; hiFilter.frequency.value = 3000; hiFilter.gain.value = 0;
+        delayNode = audioCtx.createDelay();         delayNode.delayTime.value = 0.05;
+        delayGain = audioCtx.createGain();          delayGain.gain.value = 0;
+        const dest = audioCtx.createMediaStreamDestination();
+        mediaRecorder = new MediaRecorder(dest.stream);
+        mediaRecorder.ondataavailable = e => recordedChunks.push(e.data);
+        mediaRecorder.onstop = saveRecording;
+        sourceNode.connect(loFilter); loFilter.connect(hiFilter); hiFilter.connect(analyser);
+        hiFilter.connect(delayNode); delayNode.connect(delayGain); delayGain.connect(analyser);
+        analyser.connect(audioCtx.destination); analyser.connect(dest);
+        routeAudio();
+    }
+    if (audioCtx.state !== 'running') await audioCtx.resume();
+}
 
-document.getElementById(‘audio-upload’).onchange = e => {
-const files = Array.from(e.target.files);
-playlist = files.filter(f => f.size < 110 * 1024 * 1024);
-if (playlist.length > 0) { currentIndex = 0; loadTrack(0); }
+audioEl.addEventListener('play',  () => { document.getElementById('btn-play').textContent = "PAUSE"; });
+audioEl.addEventListener('pause', () => { document.getElementById('btn-play').textContent = "PLAY";  });
+
+document.getElementById('audio-upload').onchange = e => {
+    const files = Array.from(e.target.files);
+    playlist = files.filter(f => f.size < 110 * 1024 * 1024);
+    if (playlist.length > 0) { currentIndex = 0; loadTrack(0); }
 };
 
 function loadTrack(index) {
-if (playlist.length > 0) {
-audioEl.src = URL.createObjectURL(playlist[index]);
-audioEl.load();
-statusText.textContent = “READY: “ + playlist[index].name.substring(0, 15).toUpperCase();
-updatePlaylistUI();
-}
+    if (playlist.length > 0) {
+        audioEl.src = URL.createObjectURL(playlist[index]);
+        audioEl.load();
+        statusText.textContent = "READY: " + playlist[index].name.substring(0, 15).toUpperCase();
+        updatePlaylistUI();
+    }
 }
 
 function updatePlaylistUI() {
-playlistContainer.innerHTML = “”;
-playlist.forEach((track, i) => {
-const item = document.createElement(‘div’);
-item.className = “queue-item” + (i === currentIndex ? “ active-track” : “”);
-item.textContent = (i + 1) + “. “ + track.name.toUpperCase();
-item.onclick = () => { currentIndex = i; loadTrack(i); audioEl.play(); };
-playlistContainer.appendChild(item);
-});
+    playlistContainer.innerHTML = "";
+    playlist.forEach((track, i) => {
+        const item = document.createElement('div');
+        item.className = "queue-item" + (i === currentIndex ? " active-track" : "");
+        item.textContent = (i + 1) + ". " + track.name.toUpperCase();
+        item.onclick = async () => { currentIndex = i; loadTrack(i); await ensureAudio(); audioEl.play(); };
+        playlistContainer.appendChild(item);
+    });
 }
 
-audioEl.onended = () => { if (isRepeat) { audioEl.play(); } else { skipTrack(1); } };
+audioEl.onended = async () => { if (isRepeat) { audioEl.play(); } else { await skipTrack(1); } };
 
-function skipTrack(dir) {
-if (playlist.length === 0) return;
-if (isShuffle) { currentIndex = Math.floor(Math.random() * playlist.length); }
-else           { currentIndex = (currentIndex + dir + playlist.length) % playlist.length; }
-loadTrack(currentIndex); audioEl.play();
+async function skipTrack(dir) {
+    if (playlist.length === 0) return;
+    if (isShuffle) { currentIndex = Math.floor(Math.random() * playlist.length); }
+    else           { currentIndex = (currentIndex + dir + playlist.length) % playlist.length; }
+    loadTrack(currentIndex); await ensureAudio(); audioEl.play();
 }
 
-document.getElementById(‘btn-shuffle’).onclick = function() { isShuffle = !isShuffle; this.classList.toggle(‘toggle-on’, isShuffle); };
-document.getElementById(‘btn-repeat’).onclick  = function() { isRepeat  = !isRepeat;  this.classList.toggle(‘toggle-on’, isRepeat);  };
+document.getElementById('btn-shuffle').onclick = function() { isShuffle = !isShuffle; this.classList.toggle('toggle-on', isShuffle); };
+document.getElementById('btn-repeat').onclick  = function() { isRepeat  = !isRepeat;  this.classList.toggle('toggle-on', isRepeat);  };
 
-// FIX: use playlist.length check so it doesn’t trigger on the bare page URL
-document.getElementById(‘btn-play’).onclick = () => {
-unlockAudio();
-if (playlist.length > 0) {
-if (audioEl.paused) {
-audioEl.play().catch(() => alert(“iOS Playback Blocked. Try tapping the screen again, then hit play.”));
-} else {
-audioEl.pause();
-}
-}
+document.getElementById('btn-play').onclick = async () => {
+    if (playlist.length === 0) return;
+    await ensureAudio();
+    if (audioEl.paused) {
+        audioEl.play().catch(err => alert('Playback blocked: ' + err.message + '\nTap the screen once, then press Play.'));
+    } else {
+        audioEl.pause();
+    }
 };
 
-document.getElementById(‘btn-stop’).onclick = () => { audioEl.pause(); audioEl.currentTime = 0; };
-document.getElementById(‘btn-rw’).onclick   = () => { if (audioEl.currentTime < 3) skipTrack(-1); else audioEl.currentTime -= 5; };
-document.getElementById(‘btn-ff’).onclick   = () => { if (audioEl.duration - audioEl.currentTime < 5) skipTrack(1); else audioEl.currentTime += 5; };
+document.getElementById('btn-stop').onclick = () => { audioEl.pause(); audioEl.currentTime = 0; };
+document.getElementById('btn-rw').onclick   = () => { if (audioEl.currentTime < 3) skipTrack(-1); else audioEl.currentTime -= 5; };
+document.getElementById('btn-ff').onclick   = () => { if (audioEl.duration - audioEl.currentTime < 5) skipTrack(1); else audioEl.currentTime += 5; };
 
 bypassBtn.onclick = () => {
-isProcessing = !isProcessing;
-bypassBtn.textContent = isProcessing ? “PROCESS ON” : “BYPASS OFF”;
-routeAudio();
+    isProcessing = !isProcessing;
+    bypassBtn.textContent = isProcessing ? "PROCESS ON" : "BYPASS OFF";
+    routeAudio();
 };
 
 function routeAudio() {
-if (!audioCtx) return;
-sourceNode.disconnect();
-if (isProcessing) { sourceNode.connect(loFilter); bypassBtn.className = “active”; }
-else              { sourceNode.connect(analyser); bypassBtn.className = “”;       }
+    if (!audioCtx) return;
+    sourceNode.disconnect();
+    if (isProcessing) { sourceNode.connect(loFilter); bypassBtn.className = "active"; }
+    else              { sourceNode.connect(analyser); bypassBtn.className = "";       }
 }
 
-document.getElementById(‘clarity’).oninput = e => { if (hiFilter)  hiFilter.gain.value  = (e.target.value / 100) * 25; };
-document.getElementById(‘depth’).oninput   = e => { if (delayGain) delayGain.gain.value = e.target.value / 100; };
-document.getElementById(‘contour’).oninput = e => { if (loFilter)  loFilter.gain.value  = (e.target.value / 100) * 25; };
+document.getElementById('clarity').oninput = e => { if (hiFilter)  hiFilter.gain.value  = (e.target.value / 100) * 25; };
+document.getElementById('depth').oninput   = e => { if (delayGain) delayGain.gain.value = e.target.value / 100; };
+document.getElementById('contour').oninput = e => { if (loFilter)  loFilter.gain.value  = (e.target.value / 100) * 25; };
 
-document.getElementById(‘btn-rec’).onclick = function() {
-if (!isRecording) { recordedChunks = []; mediaRecorder.start(); isRecording = true; this.classList.add(‘recording’); }
-else              { mediaRecorder.stop(); isRecording = false; this.classList.remove(‘recording’); }
+document.getElementById('btn-rec').onclick = function() {
+    if (!isRecording) { recordedChunks = []; mediaRecorder.start(); isRecording = true; this.classList.add('recording'); }
+    else              { mediaRecorder.stop(); isRecording = false; this.classList.remove('recording'); }
 };
 
 function saveRecording() {
-const blob = new Blob(recordedChunks, { type: ‘audio/mpeg’ });
-const a = document.createElement(‘a’); a.href = URL.createObjectURL(blob); a.download = ‘Impact_Mix.mp3’; a.click();
+    const blob = new Blob(recordedChunks, { type: 'audio/mpeg' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'Impact_Mix.mp3'; a.click();
 }
 
 // ═══════════════════════════════════════════════════════
 //  VISUAL ENGINE
-//  Layer 1 — drifting nebula stars   (original)
-//  Layer 2 — rotating 3-D lattice    (original globe)
-//  Layer 3 — dot dancers             (new)
 // ═══════════════════════════════════════════════════════
 let bgStars = [], latticePoints = [], dancers = [];
 const GLOBE_R = 100;
 
-// ── helpers ──────────────────────────────────────────────────────────────────
 function avgBand(data, lo, hi) {
-let s = 0, c = 0;
-for (let i = lo; i <= hi && i < data.length; i++) { s += data[i]; c++; }
-return c ? s / (c * 255) : 0;
+    let s = 0, c = 0;
+    for (let i = lo; i <= hi && i < data.length; i++) { s += data[i]; c++; }
+    return c ? s / (c * 255) : 0;
 }
 
-// Energy → colour. Unlit = dim, fully lit = vivid.
 function bandRGB(bnd, lE, mE, hE) {
-if (bnd === ‘low’)  return [255,                    Math.round(80+lE*175), 20,                        lE];
-if (bnd === ‘mid’)  return [0,                      Math.round(140+mE*115),Math.round(120+mE*135),    mE];
-return [Math.round(130+hE*125), 255,                   Math.round(220+hE*35),     hE];
+    if (bnd === 'low')  return [255, Math.round(80+lE*175), 20, lE];
+    if (bnd === 'mid')  return [0, Math.round(140+mE*115),Math.round(120+mE*135), mE];
+    return [Math.round(130+hE*125), 255, Math.round(220+hE*35), hE];
 }
 
-// ── Layer 1: nebula stars ─────────────────────────────────────────────────────
 function buildStars() {
-bgStars = [];
-for (let i = 0; i < 60; i++) {
-bgStars.push({
-x: Math.random() * 220, y: Math.random() * 220,
-sz: 0.3 + Math.random() * 0.3,
-op: Math.random() * 0.2,
-spd: Math.random() * 0.02
-});
-}
+    bgStars = [];
+    for (let i = 0; i < 60; i++) {
+        bgStars.push({
+            x: Math.random() * 220, y: Math.random() * 220,
+            sz: 0.3 + Math.random() * 0.3, op: Math.random() * 0.2, spd: Math.random() * 0.02
+        });
+    }
 }
 
-// ── Layer 2: rotating 3-D lattice (original globe engine) ────────────────────
 function buildLattice() {
-latticePoints = [];
-for (let i = 0; i < 10; i++) {
-const lat = Math.acos(-1 + (2 * i) / 10);
-for (let j = 0; j < 12; j++) {
-const lon = 2 * Math.PI * j / 12;
-const x = Math.cos(lon) * Math.sin(lat);
-const y = Math.cos(lat);
-const z = Math.sin(lon) * Math.sin(lat);
-let type = ‘mid’, fIdx = 10 + Math.floor(Math.random() * 20);
-if (y >  0.4) { type = ‘high’; fIdx = 40 + Math.floor(Math.random() * 40); }
-if (y < -0.4) { type = ‘low’;  fIdx = Math.floor(Math.random() * 10); }
-latticePoints.push({ x, y, z, type, fIdx });
-}
-}
+    latticePoints = [];
+    for (let i = 0; i < 10; i++) {
+        const lat = Math.acos(-1 + (2 * i) / 10);
+        for (let j = 0; j < 12; j++) {
+            const lon = 2 * Math.PI * j / 12;
+            const x = Math.cos(lon) * Math.sin(lat);
+            const y = Math.cos(lat);
+            const z = Math.sin(lon) * Math.sin(lat);
+            let type = 'mid', fIdx = 10 + Math.floor(Math.random() * 20);
+            if (y >  0.4) { type = 'high'; fIdx = 40 + Math.floor(Math.random() * 40); }
+            if (y < -0.4) { type = 'low';  fIdx = Math.floor(Math.random() * 10); }
+            latticePoints.push({ x, y, z, type, fIdx });
+        }
+    }
 }
 
-// ── Layer 3: dancers ──────────────────────────────────────────────────────────
 function makeDancer(ox, oy, phase, sc) {
-return {
-ox, oy, phase, sc,
-// rest offsets relative to dancer centre (px before scaling)
-parts: [
-{ n:‘head’,  rx:  0, ry:-50, sz:4.0, bnd:‘high’            },
-{ n:‘neck’,  rx:  0, ry:-40, sz:1.8, bnd:‘high’            },
-{ n:‘ls’,    rx:-12, ry:-33, sz:2.5, bnd:‘mid’             },
-{ n:‘rs’,    rx: 12, ry:-33, sz:2.5, bnd:‘mid’             },
-{ n:‘le’,    rx:-18, ry:-19, sz:2.0, bnd:‘mid’,  limb:‘la’ },
-{ n:‘re’,    rx: 18, ry:-19, sz:2.0, bnd:‘mid’,  limb:‘ra’ },
-{ n:‘lh’,    rx:-22, ry: -6, sz:1.8, bnd:‘high’, limb:‘la’ },
-{ n:‘rh’,    rx: 22, ry: -6, sz:1.8, bnd:‘high’, limb:‘ra’ },
-{ n:‘chest’, rx:  0, ry:-23, sz:2.4, bnd:‘mid’             },
-{ n:‘belly’, rx:  0, ry:-10, sz:2.4, bnd:‘mid’             },
-{ n:‘lhip’,  rx: -8, ry:  2, sz:2.5, bnd:‘low’             },
-{ n:‘rhip’,  rx:  8, ry:  2, sz:2.5, bnd:‘low’             },
-{ n:‘lk’,    rx:-10, ry: 20, sz:2.0, bnd:‘low’,  limb:‘ll’ },
-{ n:‘rk’,    rx: 10, ry: 20, sz:2.0, bnd:‘low’,  limb:‘rl’ },
-{ n:‘lf’,    rx:-12, ry: 37, sz:1.8, bnd:‘low’,  limb:‘ll’ },
-{ n:‘rf’,    rx: 12, ry: 37, sz:1.8, bnd:‘low’,  limb:‘rl’ },
-],
-bones: [
-[‘head’,‘neck’],
-[‘neck’,‘ls’],[‘neck’,‘rs’],
-[‘ls’,‘le’],  [‘le’,‘lh’],
-[‘rs’,‘re’],  [‘re’,‘rh’],
-[‘neck’,‘chest’],[‘chest’,‘belly’],
-[‘belly’,‘lhip’],[‘belly’,‘rhip’],
-[‘lhip’,‘lk’],   [‘lk’,‘lf’],
-[‘rhip’,‘rk’],   [‘rk’,‘rf’],
-]
-};
+    return {
+        ox, oy, phase, sc,
+        parts: [
+            { n:'head',  rx:  0, ry:-50, sz:4.0, bnd:'high' },
+            { n:'neck',  rx:  0, ry:-40, sz:1.8, bnd:'high' },
+            { n:'ls',    rx:-12, ry:-33, sz:2.5, bnd:'mid'  },
+            { n:'rs',    rx: 12, ry:-33, sz:2.5, bnd:'mid'  },
+            { n:'le',    rx:-18, ry:-19, sz:2.0, bnd:'mid',  limb:'la' },
+            { n:'re',    rx: 18, ry:-19, sz:2.0, bnd:'mid',  limb:'ra' },
+            { n:'lh',    rx:-22, ry: -6, sz:1.8, bnd:'high', limb:'la' },
+            { n:'rh',    rx: 22, ry: -6, sz:1.8, bnd:'high', limb:'ra' },
+            { n:'chest', rx:  0, ry:-23, sz:2.4, bnd:'mid'  },
+            { n:'belly', rx:  0, ry:-10, sz:2.4, bnd:'mid'  },
+            { n:'lhip',  rx: -8, ry:  2, sz:2.5, bnd:'low'  },
+            { n:'rhip',  rx:  8, ry:  2, sz:2.5, bnd:'low'  },
+            { n:'lk',    rx:-10, ry: 20, sz:2.0, bnd:'low',  limb:'ll' },
+            { n:'rk',    rx: 10, ry: 20, sz:2.0, bnd:'low',  limb:'rl' },
+            { n:'lf',    rx:-12, ry: 37, sz:1.8, bnd:'low',  limb:'ll' },
+            { n:'rf',    rx: 12, ry: 37, sz:1.8, bnd:'low',  limb:'rl' },
+        ],
+        bones: [
+            ['head','neck'], ['neck','ls'],['neck','rs'], ['ls','le'],  ['le','lh'],
+            ['rs','re'],  ['re','rh'], ['neck','chest'],['chest','belly'],
+            ['belly','lhip'],['belly','rhip'], ['lhip','lk'],   ['lk','lf'],
+            ['rhip','rk'],   ['rk','rf']
+        ]
+    };
 }
 
 function poseOf(d, t, lE, mE, hE) {
-const cx = 110 + d.ox, cy = 110 + d.oy;
-const bounce = Math.sin(t * 4.2 + d.phase) * lE * 8;
-const sway   = Math.sin(t * 1.9 + d.phase) * mE * 4;
-const lArm   = Math.sin(t * 3.2 + d.phase);
-const rArm   = -lArm;
-const lLeg   = Math.sin(t * 4.2 + d.phase);
-const rLeg   = -lLeg;
-const pos = {};
-d.parts.forEach(p => {
-let rx = p.rx + sway, ry = p.ry + bounce;
-switch (p.limb) {
-case ‘la’: rx += lArm * mE * 16; ry -= Math.abs(lArm) * mE * 6; break;
-case ‘ra’: rx += rArm * mE * 16; ry -= Math.abs(rArm) * mE * 6; break;
-case ‘ll’: rx += lLeg * lE * 12; ry -= (1 - Math.abs(lLeg)) * lE * 5; break;
-case ‘rl’: rx += rLeg * lE * 12; ry -= (1 - Math.abs(rLeg)) * lE * 5; break;
-}
-pos[p.n] = { x: cx + rx * d.sc, y: cy + ry * d.sc, bnd: p.bnd, sz: p.sz };
-});
-return pos;
+    const cx = 110 + d.ox, cy = 110 + d.oy;
+    const bounce = Math.sin(t * 4.2 + d.phase) * lE * 8;
+    const sway   = Math.sin(t * 1.9 + d.phase) * mE * 4;
+    const lArm   = Math.sin(t * 3.2 + d.phase);
+    const rArm   = -lArm;
+    const lLeg   = Math.sin(t * 4.2 + d.phase);
+    const rLeg   = -lLeg;
+    const pos = {};
+    d.parts.forEach(p => {
+        let rx = p.rx + sway, ry = p.ry + bounce;
+        switch (p.limb) {
+            case 'la': rx += lArm * mE * 16; ry -= Math.abs(lArm) * mE * 6; break;
+            case 'ra': rx += rArm * mE * 16; ry -= Math.abs(rArm) * mE * 6; break;
+            case 'll': rx += lLeg * lE * 12; ry -= (1 - Math.abs(lLeg)) * lE * 5; break;
+            case 'rl': rx += rLeg * lE * 12; ry -= (1 - Math.abs(rLeg)) * lE * 5; break;
+        }
+        pos[p.n] = { x: cx + rx * d.sc, y: cy + ry * d.sc, bnd: p.bnd, sz: p.sz };
+    });
+    return pos;
 }
 
 function drawDancer(d, t, lE, mE, hE) {
-const pos = poseOf(d, t, lE, mE, hE);
+    const pos = poseOf(d, t, lE, mE, hE);
 
-```
-// skeleton
-d.bones.forEach(([a, b]) => {
-    const pa = pos[a], pb = pos[b]; if (!pa || !pb) return;
-    const [r, g, bv, e] = bandRGB(pa.bnd, lE, mE, hE);
-    canvasCtx.beginPath();
-    canvasCtx.moveTo(pa.x, pa.y); canvasCtx.lineTo(pb.x, pb.y);
-    canvasCtx.strokeStyle = `rgba(${r},${g},${bv},${0.30 + e * 0.60})`;
-    canvasCtx.lineWidth   = 0.9 + e * 1.4;
-    canvasCtx.shadowColor = `rgba(${r},${g},${bv},${e * 0.9})`;
-    canvasCtx.shadowBlur  = 4 + e * 10;
-    canvasCtx.stroke();
-});
+    d.bones.forEach(([a, b]) => {
+        const pa = pos[a], pb = pos[b]; if (!pa || !pb) return;
+        const [r, g, bv, e] = bandRGB(pa.bnd, lE, mE, hE);
+        canvasCtx.beginPath();
+        canvasCtx.moveTo(pa.x, pa.y); canvasCtx.lineTo(pb.x, pb.y);
+        canvasCtx.strokeStyle = `rgba(${r},${g},${bv},${0.30 + e * 0.60})`;
+        canvasCtx.lineWidth   = 0.9 + e * 1.4;
+        canvasCtx.shadowColor = `rgba(${r},${g},${bv},${e * 0.9})`;
+        canvasCtx.shadowBlur  = 4 + e * 10;
+        canvasCtx.stroke();
+    });
 
-// joints
-d.parts.forEach(p => {
-    const pp = pos[p.n];
-    const [r, g, bv, e] = bandRGB(p.bnd, lE, mE, hE);
-    const ds = (p.sz + e * 3.5) * d.sc;
+    d.parts.forEach(p => {
+        const pp = pos[p.n];
+        const [r, g, bv, e] = bandRGB(p.bnd, lE, mE, hE);
+        const ds = (p.sz + e * 3.5) * d.sc;
 
-    // halo
-    const grad = canvasCtx.createRadialGradient(pp.x, pp.y, 0, pp.x, pp.y, ds * 2.5);
-    grad.addColorStop(0, `rgba(${r},${g},${bv},${e * 0.28})`);
-    grad.addColorStop(1, `rgba(${r},${g},${bv},0)`);
-    canvasCtx.beginPath(); canvasCtx.arc(pp.x, pp.y, ds * 2.5, 0, Math.PI * 2);
-    canvasCtx.fillStyle = grad; canvasCtx.shadowBlur = 0; canvasCtx.fill();
+        const grad = canvasCtx.createRadialGradient(pp.x, pp.y, 0, pp.x, pp.y, ds * 2.5);
+        grad.addColorStop(0, `rgba(${r},${g},${bv},${e * 0.28})`);
+        grad.addColorStop(1, `rgba(${r},${g},${bv},0)`);
+        canvasCtx.beginPath(); canvasCtx.arc(pp.x, pp.y, ds * 2.5, 0, Math.PI * 2);
+        canvasCtx.fillStyle = grad; canvasCtx.shadowBlur = 0; canvasCtx.fill();
 
-    // core
-    canvasCtx.beginPath(); canvasCtx.arc(pp.x, pp.y, ds, 0, Math.PI * 2);
-    canvasCtx.fillStyle   = `rgba(${r},${g},${bv},${0.72 + e * 0.28})`;
-    canvasCtx.shadowColor = `rgba(${r},${g},${bv},1)`;
-    canvasCtx.shadowBlur  = 5 + e * 14;
-    canvasCtx.fill();
+        canvasCtx.beginPath(); canvasCtx.arc(pp.x, pp.y, ds, 0, Math.PI * 2);
+        canvasCtx.fillStyle   = `rgba(${r},${g},${bv},${0.72 + e * 0.28})`;
+        canvasCtx.shadowColor = `rgba(${r},${g},${bv},1)`;
+        canvasCtx.shadowBlur  = 5 + e * 14;
+        canvasCtx.fill();
 
-    // specular
-    canvasCtx.beginPath(); canvasCtx.arc(pp.x - ds*0.25, pp.y - ds*0.25, ds*0.35, 0, Math.PI * 2);
-    canvasCtx.fillStyle = `rgba(255,255,255,${0.22 + e * 0.50})`;
-    canvasCtx.shadowBlur = 0; canvasCtx.fill();
-});
-canvasCtx.shadowBlur = 0;
-```
-
+        canvasCtx.beginPath(); canvasCtx.arc(pp.x - ds*0.25, pp.y - ds*0.25, ds*0.35, 0, Math.PI * 2);
+        canvasCtx.fillStyle = `rgba(255,255,255,${0.22 + e * 0.50})`;
+        canvasCtx.shadowBlur = 0; canvasCtx.fill();
+    });
+    canvasCtx.shadowBlur = 0;
 }
 
-// ── init & loop ───────────────────────────────────────────────────────────────
 function initGlobe() {
-buildStars();
-buildLattice();
-dancers = [
-makeDancer(-26, 12, 0,       0.60),
-makeDancer( 26, 12, Math.PI, 0.60),
-];
+    buildStars();
+    buildLattice();
+    dancers = [
+        makeDancer(-26, 12, 0,       0.60),
+        makeDancer( 26, 12, Math.PI, 0.60),
+    ];
 }
 
 function draw() {
-requestAnimationFrame(draw);
+    requestAnimationFrame(draw);
 
-```
-const bins  = analyser ? analyser.frequencyBinCount : 128;
-const data  = new Uint8Array(bins);
-if (analyser) analyser.getByteFrequencyData(data);
+    const bins  = analyser ? analyser.frequencyBinCount : 128;
+    const data  = new Uint8Array(bins);
+    if (analyser) analyser.getByteFrequencyData(data);
 
-// fftSize 256 → 128 bins.  Band ranges (original indices):
-const t    = Date.now() * 0.001;
-const lE   = avgBand(data,  0,  5);   // lows  (~20–300 Hz)
-const mE   = avgBand(data,  6, 30);   // mids  (~300–2k Hz)
-const hE   = avgBand(data, 31, 63);   // highs (~2k–10k Hz)
+    const t    = Date.now() * 0.001;
+    const lE   = avgBand(data,  0,  5); 
+    const mE   = avgBand(data,  6, 30); 
+    const hE   = avgBand(data, 31, 63); 
 
-// trail fade
-canvasCtx.fillStyle = 'rgba(10,10,10,0.40)';
-canvasCtx.fillRect(0, 0, 220, 220);
+    canvasCtx.fillStyle = 'rgba(10,10,10,0.32)';
+    canvasCtx.fillRect(0, 0, 220, 220);
 
-// ── Layer 1: drifting stars ──────────────────────────────────────────────
-bgStars.forEach(s => {
-    canvasCtx.beginPath(); canvasCtx.arc(s.x, s.y, s.sz, 0, Math.PI * 2);
-    canvasCtx.fillStyle = `rgba(0,255,204,${s.op})`; canvasCtx.fill();
-    s.y += s.spd; if (s.y > 220) s.y = 0;
-});
+    bgStars.forEach(s => {
+        canvasCtx.beginPath(); canvasCtx.arc(s.x, s.y, s.sz, 0, Math.PI * 2);
+        canvasCtx.fillStyle = `rgba(0,255,204,${s.op})`; canvasCtx.fill();
+        s.y += s.spd; if (s.y > 220) s.y = 0;
+    });
 
-// ── Layer 2: rotating 3-D lattice (original globe) ──────────────────────
-const rotY = Date.now() * 0.0004;
-latticePoints.forEach(p => {
-    const rx  = p.x * Math.cos(rotY) - p.z * Math.sin(rotY);
-    const vol = data[p.fIdx] / 255;
-    const sc  = GLOBE_R * (0.85 + vol * 0.25);
+    const rotY = Date.now() * 0.0004;
+    latticePoints.forEach(p => {
+        const rx  = p.x * Math.cos(rotY) - p.z * Math.sin(rotY);
+        const vol = data[p.fIdx] / 255;
+        const sc  = GLOBE_R * (0.85 + vol * 0.25);
 
-    let r, g, bv;
-    if (p.type === 'low')  { r = 255;                  g = Math.round(130 + lE*125); bv = 20; }
-    else if (p.type === 'mid')  { r = 0;               g = Math.round(190 + mE*65);  bv = Math.round(160 + mE*95); }
-    else                        { r = Math.round(170 + hE*85); g = 255;              bv = Math.round(240 + hE*15); }
+        let r, g, bv;
+        if (p.type === 'low')       { r = 255;                  g = Math.round(130 + lE*125); bv = 20; }
+        else if (p.type === 'mid')  { r = 0;                    g = Math.round(190 + mE*65);  bv = Math.round(160 + mE*95); }
+        else                        { r = Math.round(170+hE*85); g = 255;                     bv = Math.round(240 + hE*15); }
 
-    const alpha = 0.30 + vol * 0.55;
-    canvasCtx.beginPath();
-    canvasCtx.arc(110 + rx * sc, 110 + p.y * sc, 1 + vol * 3, 0, Math.PI * 2);
-    canvasCtx.shadowColor = `rgba(${r},${g},${bv},${alpha})`;
-    canvasCtx.shadowBlur  = 2 + vol * 6;
-    canvasCtx.fillStyle   = `rgba(${r},${g},${bv},${alpha})`;
-    canvasCtx.fill();
-});
-canvasCtx.shadowBlur = 0;
+        const alpha   = 0.55 + vol * 0.45;
+        const dotSize = 1.2 + vol * 3.2;
+        canvasCtx.beginPath();
+        canvasCtx.arc(110 + rx * sc, 110 + p.y * sc, dotSize, 0, Math.PI * 2);
+        canvasCtx.shadowColor = `rgba(${r},${g},${bv},${alpha})`;
+        canvasCtx.shadowBlur  = 3 + vol * 8;
+        canvasCtx.fillStyle   = `rgba(${r},${g},${bv},${alpha})`;
+        canvasCtx.fill();
+    });
+    canvasCtx.shadowBlur = 0;
 
-// ── Layer 3: dancer shadows then dancers ─────────────────────────────────
-const floorY = 110 + 12 + 37 * 0.60 + 3;
-dancers.forEach(d => {
-    canvasCtx.beginPath();
-    canvasCtx.ellipse(110 + d.ox, floorY + 2, 14 * d.sc * (1 + lE * 0.4), 2.5 * d.sc, 0, 0, Math.PI * 2);
-    canvasCtx.fillStyle = `rgba(0,255,204,${0.05 + lE * 0.12})`;
-    canvasCtx.fill();
-});
-dancers.forEach(d => drawDancer(d, t, lE, mE, hE));
-```
-
+    const floorY = 110 + 12 + 37 * 0.60 + 3;
+    dancers.forEach(d => {
+        canvasCtx.beginPath();
+        canvasCtx.ellipse(110 + d.ox, floorY + 2, 14 * d.sc * (1 + lE * 0.4), 2.5 * d.sc, 0, 0, Math.PI * 2);
+        canvasCtx.fillStyle = `rgba(0,255,204,${0.05 + lE * 0.12})`;
+        canvasCtx.fill();
+    });
+    dancers.forEach(d => drawDancer(d, t, lE, mE, hE));
 }
 
 initGlobe();
 draw();
 </script>
-
 </body>
 </html>
