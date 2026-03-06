@@ -23,33 +23,55 @@ background:var(–dark);transition:opacity 0.32s,transform 0.32s;}
 .screen.left.hidden{transform:translateX(-50px);}
 
 /* ── ONBOARDING ── */
-#ob{background:linear-gradient(170deg,#071a14 0%,#060608 60%);align-items:center;}
-.ob-hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 24px 8px;}
-.ob-icon{width:76px;height:76px;border-radius:20px;
-background:linear-gradient(135deg,#00c49a,#005544);
-display:flex;align-items:center;justify-content:center;font-size:36px;
-box-shadow:0 0 36px rgba(0,255,204,0.35),0 8px 28px rgba(0,0,0,0.6);margin-bottom:20px;}
-.ob-title{font-size:24px;font-weight:800;color:var(–neon);letter-spacing:-0.02em;
-text-align:center;line-height:1.2;margin-bottom:8px;font-family:system-ui,sans-serif;}
-.ob-sub{font-size:12px;color:rgba(0,255,204,0.45);letter-spacing:0.05em;
-text-align:center;line-height:1.6;max-width:270px;}
-.ob-features{width:100%;padding:0 18px;display:flex;flex-direction:column;gap:8px;margin-top:16px;}
-.ob-feat{display:flex;align-items:center;gap:11px;background:rgba(0,255,204,0.05);
-border:1px solid rgba(0,255,204,0.1);border-radius:11px;padding:11px 13px;}
-.ob-feat-icon{font-size:20px;flex-shrink:0;}
-.ob-feat-title{font-size:11px;font-weight:700;letter-spacing:0.1em;color:var(–neon);text-transform:uppercase;}
-.ob-feat-desc{font-size:9px;color:rgba(0,255,204,0.4);letter-spacing:0.03em;line-height:1.4;margin-top:2px;}
-.ob-dots{display:flex;gap:5px;margin:14px 0 8px;}
-.ob-dot{width:5px;height:5px;border-radius:3px;background:rgba(0,255,204,0.18);transition:all 0.3s;}
-.ob-dot.active{width:18px;background:var(–neon);box-shadow:0 0 7px var(–neon);}
-.ob-actions{padding:14px 18px 28px;display:flex;flex-direction:column;gap:9px;width:100%;}
-.ob-btn{-webkit-appearance:none;appearance:none;outline:none;border:none;font-family:inherit;cursor:pointer;
-font-weight:800;font-size:13px;letter-spacing:0.14em;text-transform:uppercase;
-padding:15px;border-radius:13px;transition:all 0.15s;width:100%;}
-.ob-btn.primary{background:var(–neon);color:#000;box-shadow:0 0 22px rgba(0,255,204,0.38);}
-.ob-btn.primary:active{transform:scale(0.96);}
-.ob-btn.skip{background:transparent;border:1px solid rgba(0,255,204,0.16);
-color:rgba(0,255,204,0.38);font-size:10px;}
+#ob{background:#050a07;align-items:center;overflow:hidden;}
+#ob::before{content:’’;position:absolute;inset:0;pointer-events:none;
+background:radial-gradient(ellipse 80% 42% at 50% 18%,rgba(0,255,160,0.14) 0%,transparent 70%),
+radial-gradient(ellipse 55% 28% at 50% 88%,rgba(0,200,120,0.07) 0%,transparent 60%);}
+.ob-hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+padding:28px 22px 6px;position:relative;}
+.ob-icon{width:92px;height:92px;border-radius:22px;
+background:linear-gradient(145deg,#00eeaa 0%,#00b87a 45%,#005e42 100%);
+display:flex;align-items:center;justify-content:center;
+box-shadow:0 0 0 1.5px rgba(0,255,180,0.3),0 0 60px rgba(0,255,150,0.5),0 16px 40px rgba(0,0,0,0.75);
+margin-bottom:24px;}
+.ob-icon svg{width:52px;height:52px;filter:drop-shadow(0 2px 10px rgba(0,0,0,0.55));}
+.ob-title{font-size:28px;font-weight:800;
+background:linear-gradient(135deg,#00ffcc 0%,#00e8a8 55%,#aaffe0 100%);
+-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+letter-spacing:-0.02em;text-align:center;line-height:1.15;
+margin-bottom:10px;font-family:system-ui,sans-serif;}
+.ob-sub{font-size:14px;color:rgba(200,255,235,0.62);letter-spacing:0.02em;
+text-align:center;line-height:1.65;max-width:280px;
+font-family:system-ui,sans-serif;font-weight:400;}
+.ob-features{width:100%;padding:0 18px;display:flex;flex-direction:column;gap:9px;margin-top:18px;}
+.ob-feat{display:flex;align-items:center;gap:14px;
+background:rgba(0,220,150,0.08);
+border:1px solid rgba(0,255,170,0.28);
+border-radius:14px;padding:14px 16px;
+box-shadow:inset 0 1px 0 rgba(0,255,170,0.12), 0 2px 12px rgba(0,0,0,0.35);}
+.ob-feat-icon{width:40px;height:40px;border-radius:11px;flex-shrink:0;
+background:rgba(0,255,170,0.15);border:1px solid rgba(0,255,170,0.35);
+display:flex;align-items:center;justify-content:center;}
+.ob-feat-icon svg{width:22px;height:22px;}
+.ob-feat-title{font-size:11px;font-weight:700;letter-spacing:0.14em;
+color:#00ffcc;text-transform:uppercase;font-family:‘SF Mono’,‘Fira Code’,monospace;
+text-shadow:0 0 12px rgba(0,255,200,0.5);}
+.ob-feat-desc{font-size:12px;color:rgba(200,255,235,0.62);letter-spacing:0.01em;
+line-height:1.5;margin-top:4px;font-family:system-ui,sans-serif;font-weight:400;}
+.ob-dots{display:flex;gap:5px;margin:18px 0 10px;}
+.ob-dot{width:5px;height:5px;border-radius:3px;background:rgba(0,255,204,0.15);transition:all 0.3s;}
+.ob-dot.active{width:20px;background:var(–neon);box-shadow:0 0 8px rgba(0,255,204,0.6);}
+.ob-actions{padding:12px 18px 32px;display:flex;flex-direction:column;gap:10px;width:100%;}
+.ob-btn{-webkit-appearance:none;appearance:none;outline:none;border:none;
+font-family:‘SF Mono’,‘Fira Code’,monospace;cursor:pointer;
+font-weight:700;font-size:12px;letter-spacing:0.18em;text-transform:uppercase;
+padding:16px;border-radius:14px;transition:all 0.18s;width:100%;}
+.ob-btn.primary{
+background:linear-gradient(135deg,#00ffcc 0%,#00d4a8 100%);color:#030e08;
+box-shadow:0 0 30px rgba(0,255,204,0.45),0 4px 18px rgba(0,0,0,0.45);}
+.ob-btn.primary:active{transform:scale(0.96);box-shadow:0 0 14px rgba(0,255,204,0.3);}
+.ob-btn.skip{background:transparent;border:1px solid rgba(0,255,204,0.18);
+color:rgba(0,255,204,0.32);font-size:10px;letter-spacing:0.2em;}
 
 /* ── MAIN ── */
 #main{z-index:5;}
@@ -244,19 +266,43 @@ color:rgba(0,255,204,0.18);padding:3px 0 10px;}
 
 <div class="screen" id="ob">
   <div class="ob-hero">
-    <div class="ob-icon">🎧</div>
+    <div class="ob-icon">
+      <svg viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M10 28v-4C10 17.4 16.9 11 25 11s15 6.4 15 13v4" stroke="rgba(255,255,255,0.95)" stroke-width="2.5" stroke-linecap="round"/>
+        <rect x="7" y="26" width="6" height="12" rx="3" fill="rgba(255,255,255,0.95)"/>
+        <rect x="37" y="26" width="6" height="12" rx="3" fill="rgba(255,255,255,0.95)"/>
+      </svg>
+    </div>
     <div class="ob-title">DepthBoost Pro</div>
-    <div class="ob-sub">BBE & AFS professional audio enhancement for every source</div>
+    <div class="ob-sub">Professional audio enhancement engineered for every source</div>
     <div class="ob-features">
-      <div class="ob-feat"><span class="ob-feat-icon">▶</span>
-        <div><div class="ob-feat-title">YouTube Playback</div>
-        <div class="ob-feat-desc">Copy a YouTube link — paste & play. Same method as Offline Player.</div></div></div>
-      <div class="ob-feat"><span class="ob-feat-icon">🔊</span>
-        <div><div class="ob-feat-title">BBE Sonic Maximizer</div>
-        <div class="ob-feat-desc">Studio-grade depth, clarity & bass enhancement</div></div></div>
-      <div class="ob-feat"><span class="ob-feat-icon">📁</span>
-        <div><div class="ob-feat-title">All Sources Supported</div>
-        <div class="ob-feat-desc">Local files · URL streams · System capture · Microphone</div></div></div>
+      <div class="ob-feat">
+        <div class="ob-feat-icon">
+          <svg viewBox="0 0 20 20" fill="none"><polygon points="6,4 17,10 6,16" fill="#00ffcc" filter="url(#g)"/></svg>
+        </div>
+        <div>
+          <div class="ob-feat-title">YouTube Playback</div>
+          <div class="ob-feat-desc">Copy any YouTube link, tap Paste &amp; Play — streams instantly</div>
+        </div>
+      </div>
+      <div class="ob-feat">
+        <div class="ob-feat-icon">
+          <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="#00ffcc" stroke-width="1.5"/><path d="M5 10 Q7.5 4 10 10 Q12.5 16 15 10" stroke="#00ffcc" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+        </div>
+        <div>
+          <div class="ob-feat-title">Sonic Enhancement</div>
+          <div class="ob-feat-desc">Studio-grade depth, clarity &amp; bass — six one-tap presets</div>
+        </div>
+      </div>
+      <div class="ob-feat">
+        <div class="ob-feat-icon">
+          <svg viewBox="0 0 20 20" fill="none"><rect x="2" y="6" width="16" height="11" rx="2" stroke="#00ffcc" stroke-width="1.5"/><path d="M2 9.5h16" stroke="#00ffcc" stroke-width="1.2" opacity="0.45"/><path d="M6 4h8" stroke="#00ffcc" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
+        <div>
+          <div class="ob-feat-title">All Sources</div>
+          <div class="ob-feat-desc">Local files · URL streams · System audio · Microphone</div>
+        </div>
+      </div>
     </div>
   </div>
   <div class="ob-dots"><div class="ob-dot active"></div><div class="ob-dot"></div><div class="ob-dot"></div></div>
@@ -412,7 +458,7 @@ color:rgba(0,255,204,0.18);padding:3px 0 10px;}
       <span class="pro-badge">PRO</span>
       <div class="pro-text">
         <div class="pro-title">Unlock DepthBoost Pro</div>
-        <div class="pro-desc">EQ presets · No ads · Priority processing · $2.99/mo</div>
+        <div class="pro-desc">Custom presets · No ads · Premium processing · $2.99/mo</div>
       </div>
       <span style="color:var(--amber);font-size:13px;">›</span>
     </div>
@@ -420,7 +466,7 @@ color:rgba(0,255,204,0.18);padding:3px 0 10px;}
       <div class="st-sec-title">Audio</div>
       <div class="st-row"><div class="st-row-l"><div class="st-row-label">Haptic Feedback</div><div class="st-row-desc">Vibrate on play / pause</div></div><div class="toggle on" data-key="haptic"></div></div>
       <div class="st-row"><div class="st-row-l"><div class="st-row-label">Audio Fade Out</div><div class="st-row-desc">Smooth stop on capture end</div></div><div class="toggle on" data-key="fadeout"></div></div>
-      <div class="st-row"><div class="st-row-l"><div class="st-row-label">AFS Auto-Notch</div><div class="st-row-desc">Real-time feedback suppression</div></div><div class="toggle on" data-key="afs"></div></div>
+      <div class="st-row"><div class="st-row-l"><div class="st-row-label">Smart Resonance Filter</div><div class="st-row-desc">Analyzes &amp; removes harsh resonances</div></div><div class="toggle on" data-key="afs"></div></div>
       <div class="st-row"><div class="st-row-l"><div class="st-row-label">Noise Gate</div><div class="st-row-desc">Silence low-level noise floor</div></div><div class="toggle" data-key="gate"></div></div>
     </div>
     <div class="st-section">
@@ -435,7 +481,7 @@ color:rgba(0,255,204,0.18);padding:3px 0 10px;}
       <div class="st-nav" id="nav-faq"><span class="st-nav-icon">❓</span><span class="st-nav-lbl">Frequently Asked Questions</span><span class="st-nav-chev">›</span></div>
       <div class="st-nav" id="nav-rep"><span class="st-nav-icon">⚠️</span><span class="st-nav-lbl">Report an Issue</span><span class="st-nav-chev">›</span></div>
     </div>
-    <div class="st-version">DEPTHBOOST PRO v1.0 · BBE PROCESSING ENGINE</div>
+    <div class="st-version">DEPTHBOOST PRO  ·  v1.0</div>
   </div>
 </div>
 
