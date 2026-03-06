@@ -162,6 +162,7 @@ header {
     color:var(--neon); -webkit-text-fill-color:var(--neon);
     font-family:inherit; font-size:10px; padding:9px 10px;
     border-radius:6px; outline:none; width:100%;
+    transition: border-color 0.25s, box-shadow 0.25s;
 }
 #ios-url-inp::placeholder { color:rgba(0,255,204,0.3); }
 #ios-now-playing {
@@ -177,7 +178,6 @@ header {
 .chip.warn { color:var(--amber); -webkit-text-fill-color:var(--amber); animation:blink 1.4s ease-in-out infinite; }
 .chip.ok   { color:var(--neon);  -webkit-text-fill-color:var(--neon); animation:none; }
 
-/* Mic mute indicator */
 #mic-mute-indicator {
 display:none; text-align:center; font-size:10px; letter-spacing:2px;
 color:var(–amber); -webkit-text-fill-color:var(–amber);
@@ -241,7 +241,6 @@ header { padding:8px 12px; }
                 <div class="knob-title">DEPTH</div>
                 <div class="knob-outer" id="knob-boost" data-val="55">
                     <svg class="knob-svg" viewBox="0 0 82 82">
-                        <!-- Track arc: 225deg start, 270deg sweep -->
                         <circle cx="41" cy="41" r="32" fill="none"
                             stroke="rgba(0,255,204,0.12)" stroke-width="4"
                             stroke-dasharray="150.80 201.06"
@@ -303,7 +302,7 @@ header { padding:8px 12px; }
                 <button class="btn" id="ios-url-btn">&#x1F517; URL</button>
             </div>
             <div id="ios-url-row">
-                <input id="ios-url-inp" type="url" placeholder="https:// audio URL (mp3, m4a, aac…)">
+                <input id="ios-url-inp" type="url" placeholder="Direct .mp3 / .m4a / .wav URL (not YouTube)">
                 <button class="btn go" id="ios-url-load" style="white-space:nowrap; padding:9px 12px;">LOAD</button>
             </div>
             <div id="ios-now-playing"></div>
@@ -464,7 +463,6 @@ let afsN1, afsN2, afsN3;
 let seriesGain, parallelGain;
 let loShelf, afsLo1, afsLo2, afsLo3, loGain;
 let sumNode, limiter, masterGain, gateGain;
-// Voice suppression filters (notch out human vocal range 300–3400 Hz when mic input)
 let voiceNotch1, voiceNotch2, voiceNotch3, voiceNotch4, voiceHP, voiceMuteGain;
 let gateEnv=0, gateOpen=false;
 let afsMidTimer=null, afsLoTimer=null, gateTimer=null;
@@ -523,91 +521,58 @@ try { navigator.mediaDevices.addEventListener('devicechange',loadOutputDevices);
 //  NODE FACTORY
 // ═══════════════════════════════════════════════════════
 function buildNodes(){
-    // ── BBE 882i: Hi-Def shelving + presence peak ──────────────────────────────
     bbeHi=actx.createBiquadFilter(); bbeHi.type='highshelf'; bbeHi.frequency.value=3200; bbeHi.gain.value=0;
     bbePresence=actx.createBiquadFilter(); bbePresence.type='peaking'; bbePresence.frequency.value=4800; bbePresence.Q.value=0.7; bbePresence.gain.value=0;
     bbeWave=actx.createWaveShaper(); bbeWave.oversample='4x'; setWaveshaper(0);
-
-    // ── Pre-gain before series chain — this is what drives audible volume ──────
-    // Gives the BBE path real headroom to push through the limiter
     seriesGain=actx.createGain(); seriesGain.gain.value=1.0;
-
-    // ── FBQ1000: notch muddy resonances, then re-amplify ──────────────────────
     fbqN1=actx.createBiquadFilter(); fbqN1.type='notch'; fbqN1.frequency.value=400;  fbqN1.Q.value=8;
     fbqN2=actx.createBiquadFilter(); fbqN2.type='notch'; fbqN2.frequency.value=800;  fbqN2.Q.value=8;
     fbqN3=actx.createBiquadFilter(); fbqN3.type='notch'; fbqN3.frequency.value=2500; fbqN3.Q.value=8;
-
-    // ── DBX AFS-2 parallel path ────────────────────────────────────────────────
     afsN1=actx.createBiquadFilter(); afsN1.type='notch'; afsN1.frequency.value=630;  afsN1.Q.value=12;
     afsN2=actx.createBiquadFilter(); afsN2.type='notch'; afsN2.frequency.value=1250; afsN2.Q.value=12;
     afsN3=actx.createBiquadFilter(); afsN3.type='notch'; afsN3.frequency.value=3150; afsN3.Q.value=12;
     parallelGain=actx.createGain(); parallelGain.gain.value=1.0;
-
-    // ── BBE Lo Contour + AFS lo ────────────────────────────────────────────────
     loShelf=actx.createBiquadFilter(); loShelf.type='lowshelf'; loShelf.frequency.value=getContourFreq(); loShelf.gain.value=0;
     afsLo1=actx.createBiquadFilter(); afsLo1.type='notch'; afsLo1.frequency.value=100; afsLo1.Q.value=6;
     afsLo2=actx.createBiquadFilter(); afsLo2.type='notch'; afsLo2.frequency.value=200; afsLo2.Q.value=6;
     afsLo3=actx.createBiquadFilter(); afsLo3.type='notch'; afsLo3.frequency.value=160; afsLo3.Q.value=6;
     loGain=actx.createGain(); loGain.gain.value=0;
-
-    // ── Voice suppression (mic mode only) ────────────────────────────────────
     voiceHP=actx.createBiquadFilter(); voiceHP.type='highpass'; voiceHP.frequency.value=300; voiceHP.Q.value=0.7;
     voiceNotch1=actx.createBiquadFilter(); voiceNotch1.type='notch'; voiceNotch1.frequency.value=500;  voiceNotch1.Q.value=3;
     voiceNotch2=actx.createBiquadFilter(); voiceNotch2.type='notch'; voiceNotch2.frequency.value=1000; voiceNotch2.Q.value=3;
     voiceNotch3=actx.createBiquadFilter(); voiceNotch3.type='notch'; voiceNotch3.frequency.value=2000; voiceNotch3.Q.value=3;
     voiceNotch4=actx.createBiquadFilter(); voiceNotch4.type='notch'; voiceNotch4.frequency.value=3400; voiceNotch4.Q.value=3;
     voiceMuteGain=actx.createGain(); voiceMuteGain.gain.value=1;
-
-    // ── Sum → transparent limiter → master ────────────────────────────────────
-    // sumNode: 3 paths (series 0.6, parallel 0.4, lo ~0.5) → scale down so sum ≤ 1.0
     sumNode = actx.createGain(); sumNode.gain.value = 0.55;
-
-    // Limiter: transparent ceiling — only catches true peaks, not constant compression
     limiter = actx.createDynamicsCompressor();
-    limiter.threshold.value = -3;    // only engages near true 0 dBFS
-    limiter.knee.value = 3;          // soft knee, inaudible onset
-    limiter.ratio.value = 20;        // hard limit above threshold
-    limiter.attack.value  = 0.001;   // 1ms — fast enough to catch transients
-    limiter.release.value = 0.15;    // 150ms — slow enough to not pump
-
-    // Master: unity. Enhancement comes from EQ, not raw gain.
+    limiter.threshold.value = -3; limiter.knee.value = 3;
+    limiter.ratio.value = 20; limiter.attack.value = 0.001; limiter.release.value = 0.15;
     masterGain = actx.createGain(); masterGain.gain.value = 1.0;
-
     gateGain = actx.createGain(); gateGain.gain.value = 0;
 }
 
 function wireGraph(withVoiceSuppression){
-    // Insert voice suppression after source if mic input
     let effectiveSrc;
     if(withVoiceSuppression){
-        // Silence the vocal range: HP + cascaded notches + gain mute
         srcNode.connect(voiceHP);
-        voiceHP.connect(voiceNotch1);
-        voiceNotch1.connect(voiceNotch2);
-        voiceNotch2.connect(voiceNotch3);
-        voiceNotch3.connect(voiceNotch4);
+        voiceHP.connect(voiceNotch1); voiceNotch1.connect(voiceNotch2);
+        voiceNotch2.connect(voiceNotch3); voiceNotch3.connect(voiceNotch4);
         voiceNotch4.connect(voiceMuteGain);
-        // voiceMuteGain set to 0 = silence user voice back into speakers
         voiceMuteGain.gain.value = 0;
         effectiveSrc = voiceMuteGain;
     } else {
         effectiveSrc = srcNode;
     }
-
     effectiveSrc.connect(bbeHi); bbeHi.connect(bbePresence); bbePresence.connect(bbeWave);
     bbeWave.connect(fbqN1); fbqN1.connect(fbqN2); fbqN2.connect(fbqN3);
     fbqN3.connect(seriesGain); seriesGain.connect(sumNode);
-
     effectiveSrc.connect(afsN1); afsN1.connect(afsN2); afsN2.connect(afsN3);
     afsN3.connect(parallelGain); parallelGain.connect(sumNode);
-
     effectiveSrc.connect(loShelf); loShelf.connect(afsLo1); afsLo1.connect(afsLo2); afsLo2.connect(afsLo3);
     afsLo3.connect(loGain); loGain.connect(sumNode);
-
     sumNode.connect(limiter); limiter.connect(masterGain);
     masterGain.connect(gateGain); gateGain.connect(analyser);
     analyser.connect(actx.destination);
-
     if(typeof actx.setSinkId==='function' && sinkId && sinkId!=='default')
         actx.setSinkId(sinkId).catch(()=>{});
 }
@@ -621,17 +586,13 @@ function buildGraphFromStream(src, micInput){
     applyBoost(getKnobVal('boost')); applyBass(getKnobVal('bass'));
 }
 
-// createMediaElementSource() can only be called ONCE per element — ever.
-// After that reuse srcNode and just swap audioEl.src.
 let _elemSrcCreated = false;
 
 function buildGraphFromElement(audioEl){
-    // Create or resume AudioContext
     if(!actx || actx.state === 'closed'){
         actx = new(window.AudioContext||window.webkitAudioContext)({sampleRate:44100, latencyHint:'playback'});
     }
     if(actx.state === 'suspended') actx.resume();
-
     if(!_elemSrcCreated){
         analyser = actx.createAnalyser();
         analyser.fftSize = 2048;
@@ -649,17 +610,11 @@ function buildGraphFromElement(audioEl){
 
 // ═══════════════════════════════════════════════════════
 //  DSP FUNCTIONS
-//  Philosophy: EQ filters do the enhancement (shelf/peak boosts are perceptually
-//  loud without clipping). Path gains stay near unity. Limiter is a safety net,
-//  not a brick wall being hammered constantly.
 // ═══════════════════════════════════════════════════════
 function setWaveshaper(drive){
-    // Gentle soft-clip saturation — adds warmth/harmonics, not fuzz.
-    // drive 0 = transparent, drive 1 = subtle warmth, never hard-clips.
     const n = 512, curve = new Float32Array(n);
     for(let i = 0; i < n; i++){
         const x = (i * 2 / n) - 1;
-        // Soft-knee tanh-based saturation — stays well within ±1
         curve[i] = drive < 0.001 ? x : Math.tanh(x * (1 + drive * 2)) / Math.tanh(1 + drive * 2);
     }
     bbeWave.curve = curve;
@@ -667,48 +622,32 @@ function setWaveshaper(drive){
 
 function applyBoost(v){
     if(!actx) return;
-    // DEPTH knob (id=boost): controls BBE hi-def clarity chain
-    // EQ gains do the audible work. Path mix gains stay at unity.
-
-    // BBE 882i Hi-Def high-shelf: air and sparkle above 3.2 kHz (+0 to +10 dB)
     bbeHi.gain.value = v * 10;
-    // BBE presence peak at 4.5 kHz: vocal clarity and cut-through (+0 to +8 dB)
     bbePresence.gain.value = v * 8;
-    // Waveshaper: subtle harmonic saturation for perceived density (0 to 0.6)
     setWaveshaper(v * 0.6);
-
-    // FBQ notch: cut muddy resonances before boosting (-0 to -6 dB)
     const nd = -(v * 6);
     fbqN1.gain.value = nd; fbqN2.gain.value = nd; fbqN3.gain.value = nd;
-
-    // Path gains: unity blend. Small tilt toward series (has BBE processing).
     seriesGain.gain.value   = 0.6;
     parallelGain.gain.value = 0.4;
 }
 
 function applyBass(v){
     if(!actx) return;
-    // BOOST knob (id=bass): controls lo contour / sub depth
-    // Low-shelf boost (+0 to +10 dB) — audible but not overloading
     loShelf.gain.value = v * 10;
-    // AFS lo notches: cut boxy low-mid buildup before boosting
     const nd = -(v * 5);
     afsLo1.gain.value = nd; afsLo2.gain.value = nd; afsLo3.gain.value = nd;
-    // loGain: fixed near unity, shelf does the work
-    loGain.gain.value = 0.35 + v * 0.30;  // 0.35 to 0.65
+    loGain.gain.value = 0.35 + v * 0.30;
 }
 
 function applyBypass(on){
     if(!actx) return;
     if(on){
-        // Flat passthrough: no EQ, no saturation, unity gains
         bbeHi.gain.value=0; bbePresence.gain.value=0; setWaveshaper(0);
         fbqN1.gain.value=0; fbqN2.gain.value=0; fbqN3.gain.value=0;
         seriesGain.gain.value=0.6; parallelGain.gain.value=0.4;
         loShelf.gain.value=0;
         afsLo1.gain.value=0; afsLo2.gain.value=0; afsLo3.gain.value=0;
-        loGain.gain.value=0.35;
-        masterGain.gain.value=1.0;
+        loGain.gain.value=0.35; masterGain.gain.value=1.0;
     } else {
         applyBoost(getKnobVal('boost')); applyBass(getKnobVal('bass'));
         masterGain.gain.value=1.0;
@@ -753,8 +692,6 @@ function getContourFreq(){
 function confirmHeadphones(){
     if(!actx||!gateGain) return;
     hpConfirmed=true;
-    // With headphones confirmed, we can allow the processed signal through
-    // but voice mute stays active (voiceMuteGain=0 persists from wireGraph)
     gateGain.gain.setTargetAtTime(1,actx.currentTime,0.05);
     document.getElementById('btn-confirm').classList.remove('show');
     document.getElementById('mic-mute-indicator').classList.add('show');
@@ -786,12 +723,25 @@ function startNoiseGate(){
 }
 
 // ═══════════════════════════════════════════════════════
-//  iOS SOURCE LOADER
+//  iOS / DESKTOP SOURCE LOADER
 // ═══════════════════════════════════════════════════════
 const iosAudioEl = document.getElementById('ios-audio');
 
+// Sites that don't serve a raw audio stream
+const BLOCKED_HOSTS = /youtube\.com|youtu\.be|soundcloud\.com|spotify\.com|tiktok\.com|music\.apple\.com|deezer\.com|pandora\.com/i;
+
+function checkBlockedURL(url){
+    if(!BLOCKED_HOSTS.test(url)) return null;
+    if(/youtu/i.test(url))       return 'YOUTUBE';
+    if(/soundcloud/i.test(url))  return 'SOUNDCLOUD';
+    if(/spotify/i.test(url))     return 'SPOTIFY';
+    if(/tiktok/i.test(url))      return 'TIKTOK';
+    if(/apple/i.test(url))       return 'APPLE MUSIC';
+    if(/deezer/i.test(url))      return 'DEEZER';
+    return 'THIS STREAMING SITE';
+}
+
 function initFileLoader(){
-    // Show the file/URL section on ALL platforms
     document.getElementById('ios-src').classList.add('show');
 
     document.getElementById('ios-file').addEventListener('change', e=>{
@@ -806,8 +756,23 @@ function initFileLoader(){
     });
 
     document.getElementById('ios-url-load').addEventListener('click',()=>{
-        const url = document.getElementById('ios-url-inp').value.trim();
+        const inp = document.getElementById('ios-url-inp');
+        const url = inp.value.trim();
         if(!url){ setStatus('ENTER A VALID URL'); return; }
+
+        // ── Block streaming platforms that don't expose raw audio ──────────────
+        const blocked = checkBlockedURL(url);
+        if(blocked){
+            chip.textContent = blocked + ' \u00B7 NEEDS A DIRECT MP3 / M4A / WAV URL';
+            chip.className = 'chip warn';
+            setStatus('UNSUPPORTED SOURCE \u00B7 USE DIRECT AUDIO URL');
+            setPill('ERROR','err');
+            inp.style.borderColor = 'rgba(255,60,60,0.6)';
+            inp.style.boxShadow   = '0 0 10px rgba(255,40,40,0.18)';
+            setTimeout(()=>{ inp.style.borderColor=''; inp.style.boxShadow=''; }, 2600);
+            return;
+        }
+
         const label = url.split('/').pop().split('?')[0].slice(0,32) || 'STREAM';
         iosPlay(url, label);
     });
@@ -822,7 +787,6 @@ function initFileLoader(){
         setStatus(isBypassed?'BYPASSED \u00B7 PASSTHROUGH':'ENHANCING \u00B7 ACTIVE');
     });
 
-    // On iOS: hide system capture buttons (can't capture system audio)
     if(isIOS){
         document.getElementById('capture-row').style.display = 'none';
         setStatus('LOAD FILE OR URL TO BOOST');
@@ -833,20 +797,14 @@ function initFileLoader(){
 }
 
 function iosPlay(url, label){
-    // Stop any current playback
     iosAudioEl.pause();
-
-    // Wire the graph first (reuses existing context/nodes if already built)
     buildGraphFromElement(iosAudioEl);
     loadOutputDevices();
-
-    // Set source AFTER graph is wired — changing src on a connected element is safe
     iosAudioEl.src = url;
     iosAudioEl.loop = false;
     iosAudioEl.volume = 1;
     iosAudioEl.crossOrigin = 'anonymous';
 
-    // Ensure AudioContext is running before play()
     const doPlay = () => {
         if(actx && actx.state === 'suspended') actx.resume();
         const playPromise = iosAudioEl.play();
@@ -860,11 +818,10 @@ function iosPlay(url, label){
                 chip.className = 'chip ok';
             }).catch(err=>{
                 console.warn('play() blocked:', err);
-                // Show native player as fallback — user taps play manually
                 iosAudioEl.style.cssText = 'display:block; width:100%; margin-top:8px; filter:invert(0.8) hue-rotate(120deg);';
                 iosAudioEl.controls = true;
                 setStatus('TAP \u25B6 ON PLAYER BELOW');
-                chip.textContent = 'TAP PLAY TO START · AUTOPLAY BLOCKED';
+                chip.textContent = 'TAP PLAY TO START \u00B7 AUTOPLAY BLOCKED';
                 chip.className = 'chip warn';
                 iosAudioEl.addEventListener('play', ()=>{
                     if(actx && actx.state === 'suspended') actx.resume();
@@ -879,16 +836,15 @@ function iosPlay(url, label){
         }
     };
 
-    // canplaythrough = file is ready; use timeout as safety fallback
     iosAudioEl.addEventListener('canplay', doPlay, {once:true});
     iosAudioEl.addEventListener('error', ()=>{
         setStatus('LOAD FAILED \u00B7 CHECK URL / FORMAT');
-        chip.textContent = 'ERROR: CANNOT LOAD SOURCE · TRY MP3 OR WAV';
+        chip.textContent = 'ERROR: CANNOT LOAD SOURCE \u00B7 TRY MP3 OR WAV';
         chip.className = 'chip warn';
         setPill('ERROR','err');
         isLive = false;
     }, {once:true});
-    iosAudioEl.load(); // trigger load after src is set
+    iosAudioEl.load();
 
     iosAudioEl.addEventListener('ended', ()=>{
         isLive = false;
@@ -968,12 +924,9 @@ async function getMic(){
 
 function stopCapture(){
     iosAudioEl.pause();
-    // Only stop stream tracks — don't close actx if element source was built
-    // (closing actx would break the persistent MediaElementSource graph)
     if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
     [afsMidTimer,afsLoTimer,gateTimer].forEach(t=>{ if(t) clearInterval(t); });
     afsMidTimer=afsLoTimer=gateTimer=null;
-    // Only close actx for stream-based (mic/system) capture, not element-source
     if(actx && !_elemSrcCreated){ actx.close(); actx=null; analyser=null; srcNode=null; }
     isLive=false; isBypassed=false; isMicInput=false; hpConfirmed=false; gateEnv=0; gateOpen=false;
     document.getElementById('btn-confirm').classList.remove('show');
@@ -1000,43 +953,27 @@ btnBypass.addEventListener('click',()=>{
 });
 
 // ═══════════════════════════════════════════════════════
-//  ROTARY KNOBS — FIXED
-//  Geometry: r=32, circumference=201.06
-//  Sweep: 270° (from 225° to 135° going clockwise)
-//  At 0%: tick at -135deg (7 o'clock). At 100%: tick at +135deg (5 o'clock).
-//  Arc length at fraction f: f * (270/360) * 201.06 = f * 150.80
-//  Offset: circle starts at 3-o'clock. We want arc to start at 225° (= -135° from top = +225° from 3-o-clock).
-//  stroke-dashoffset to shift start point: -(225/360)*201.06 = -125.66
-//  But we want to start at 225° CCW from right = 225° in SVG coords.
-//  SVG circles go clockwise from 3-o'clock. 225° from 3-o'clock clockwise = 7-o'clock.
-//  dashoffset = -(225/360)*CIRC = -125.66 shifts the dash start to 7-o'clock. ✓
+//  ROTARY KNOBS
 // ═══════════════════════════════════════════════════════
-const CIRC = 201.06;          // 2 * π * 32
-const ARC_MAX = 150.80;       // (270/360) * CIRC
-const DASH_OFFSET = -125.66;  // -(225/360) * CIRC  → starts arc at 7-o'clock
+const CIRC = 201.06;
+const ARC_MAX = 150.80;
+const DASH_OFFSET = -125.66;
 
 function getKnobVal(id){ return parseInt(document.getElementById('knob-'+id).dataset.val)/100; }
 
 function updateKnobUI(id, pct){
     const frac = pct / 100;
-    // Tick angle: -135deg at 0%, +135deg at 100%
     const deg = -135 + frac * 270;
     document.getElementById('ktick-'+id).style.transform = `rotate(${deg}deg)`;
-
-    // Arc
     const arcLen = frac * ARC_MAX;
     const arc = document.getElementById('karc-'+id);
     arc.setAttribute('stroke-dasharray', `${arcLen} ${CIRC}`);
     arc.setAttribute('stroke-dashoffset', String(DASH_OFFSET));
-
-    // Colour shift: green→cyan as value increases
     const hue = 165 - frac * 40;
     const col = `hsl(${hue},100%,58%)`;
     arc.setAttribute('stroke', col);
     arc.style.filter = `drop-shadow(0 0 6px ${col})`;
     document.getElementById('ktick-'+id).setAttribute('stroke', col);
-
-    // Label — DEPTH knob (id=boost) shows clarity dB, BOOST knob (id=bass) shows lo dB
     const dB = (frac * 24).toFixed(1);
     const loDB = (frac * 18).toFixed(1);
     document.getElementById('kval-'+id).textContent =
@@ -1045,7 +982,6 @@ function updateKnobUI(id, pct){
             : (pct === 0 ? '0 dB' : '+' + loDB + ' dB');
     document.getElementById('kval-'+id).style.setProperty('-webkit-text-fill-color', col);
     document.getElementById('kval-'+id).style.color = col;
-
     if(!isBypassed){
         if(id === 'boost') applyBoost(frac);
         if(id === 'bass')  applyBass(frac);
@@ -1084,7 +1020,6 @@ function bindKnob(id){
         updateKnobUI(id, n);
         e.preventDefault();
     }, {passive:false});
-    // Double-click to reset to default
     el.addEventListener('dblclick', () => {
         const def = id === 'boost' ? 55 : 35;
         el.dataset.val = def;
@@ -1092,7 +1027,6 @@ function bindKnob(id){
     });
 }
 
-// Sync track arcs to correct geometry on init
 document.querySelectorAll('.knob-outer svg circle[stroke="rgba(0,255,204,0.12)"]').forEach(c=>{
     c.setAttribute('stroke-dasharray', `${ARC_MAX} ${CIRC}`);
     c.setAttribute('stroke-dashoffset', String(DASH_OFFSET));
