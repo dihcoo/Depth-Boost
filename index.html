@@ -4,6 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Depth Impact Hybrid</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Impact">
+    <link rel="apple-touch-icon" href="icon-192.png">
+
     <style>
         :root { --neon: #00ffcc; --bg: #0a0a0a; --panel: #141414; }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -213,6 +220,7 @@ function updatePlaylistUI() {
     });
 }
 
+// Logic updated to respect playlist end
 audioEl.onended = async () => { if (isRepeat) { audioEl.play(); } else { await skipTrack(1); } };
 
 async function skipTrack(dir) {
@@ -224,15 +232,15 @@ async function skipTrack(dir) {
     } else { 
         const nextIndex = currentIndex + dir;
         
-        // If we reach the end of the playlist
+        // If we reach the end of the playlist, hard stop
         if (nextIndex >= playlist.length) {
             audioEl.pause();
             audioEl.currentTime = 0;
             document.getElementById('btn-play').textContent = "PLAY";
-            return; // Stop playback and exit without looping
+            return; 
         }
         
-        // If we rewind past the very first track, just stay on the first track
+        // Prevents rewinding past the first track
         if (nextIndex < 0) {
             currentIndex = 0;
         } else {
@@ -293,7 +301,7 @@ document.getElementById('btn-rec').onclick = function() {
 };
 
 function showVideoPlayback() {
-    // Use the exact mime type we recorded in, instead of hardcoding webm
+    // Use the exact mime type we recorded in
     const mimeType = mediaRecorder.recordingMimeType || 'video/webm';
     const blob = new Blob(recordedChunks, { type: mimeType });
     const videoURL = URL.createObjectURL(blob);
@@ -302,7 +310,7 @@ function showVideoPlayback() {
     const modal = document.getElementById('video-modal');
     
     videoEl.src = videoURL;
-    videoEl.loop = isRepeat; // Respect the Repeat button for the video playback
+    videoEl.loop = isRepeat; // Respect the RPT button setting
     modal.style.display = 'flex';
 
     document.getElementById('btn-close-video').onclick = () => {
@@ -521,6 +529,17 @@ function draw() {
 
 initGlobe();
 draw();
+
+// ═══════════════════════════════════════════════════════
+//  PWA SERVICE WORKER REGISTRATION
+// ═══════════════════════════════════════════════════════
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+            .then(reg => console.log('Service Worker registered!'))
+            .catch(err => console.log('Service Worker registration failed: ', err));
+    });
+}
 </script>
 
 </body>
