@@ -21,7 +21,7 @@
         .intro-title { color: var(--neon); font-size: 1.2rem; letter-spacing: 3px; margin-bottom: 20px; text-transform: uppercase; font-weight: bold; }
         .intro-text { font-size: 10px; line-height: 1.8; color: #aaa; margin-bottom: 30px; letter-spacing: 1px; text-align: left; }
         .intro-text span { color: var(--neon); font-weight: bold; }
-        #btn-enter { font-size: 12px; padding: 15px 40px; width: 100%; letter-spacing: 2px; }
+        #btn-enter { font-size: 12px; padding: 15px 40px; width: 100%; letter-spacing: 2px; cursor: pointer; }
 
         .top-header { padding: 12px; background: #000; border-bottom: 2px solid var(--neon); text-align: center; flex-shrink: 0; }
         .top-header h1 { margin: 0; font-size: 1rem; letter-spacing: 3px; text-transform: uppercase; }
@@ -217,9 +217,32 @@ audioEl.onended = async () => { if (isRepeat) { audioEl.play(); } else { await s
 
 async function skipTrack(dir) {
     if (playlist.length === 0) return;
-    if (isShuffle) { currentIndex = Math.floor(Math.random() * playlist.length); }
-    else           { currentIndex = (currentIndex + dir + playlist.length) % playlist.length; }
-    loadTrack(currentIndex); await ensureAudio(); audioEl.play();
+    
+    if (isShuffle) { 
+        // If Shuffle is on, pick a random track
+        currentIndex = Math.floor(Math.random() * playlist.length); 
+    } else { 
+        const nextIndex = currentIndex + dir;
+        
+        // If we reach the end of the playlist
+        if (nextIndex >= playlist.length) {
+            audioEl.pause();
+            audioEl.currentTime = 0;
+            document.getElementById('btn-play').textContent = "PLAY";
+            return; // Stop playback and exit without looping
+        }
+        
+        // If we rewind past the very first track, just stay on the first track
+        if (nextIndex < 0) {
+            currentIndex = 0;
+        } else {
+            currentIndex = nextIndex;
+        }
+    }
+    
+    loadTrack(currentIndex); 
+    await ensureAudio(); 
+    audioEl.play();
 }
 
 document.getElementById('btn-shuffle').onclick = function() { isShuffle = !isShuffle; this.classList.toggle('toggle-on', isShuffle); };
@@ -279,6 +302,7 @@ function showVideoPlayback() {
     const modal = document.getElementById('video-modal');
     
     videoEl.src = videoURL;
+    videoEl.loop = isRepeat; // Respect the Repeat button for the video playback
     modal.style.display = 'flex';
 
     document.getElementById('btn-close-video').onclick = () => {
